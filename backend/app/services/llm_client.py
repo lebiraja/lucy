@@ -43,11 +43,31 @@ async def chat_completion(
         except Exception:
             model_name = "default"
 
+    # Safety: Enforce strict prompt truncation for models with tiny contexts
+    # Assume 1 token ~= 3.5 characters for basic truncation
+    safe_max_tokens = min(agent.max_tokens, 512) if agent.max_tokens else 512
+    # Default to 1024 total context if unknown, leaving safe_max_tokens for output
+    max_context_tokens = 1024 
+    max_input_tokens = max(max_context_tokens - safe_max_tokens - 100, 200) # leave 100 buffer
+    max_input_chars = int(max_input_tokens * 3.5)
+
+    processed_messages = []
+    for msg in messages:
+        content = msg.get("content", "")
+        if isinstance(content, str) and len(content) > max_input_chars:
+            # Truncate content and append a note
+            content = content[:max_input_chars] + "\n\n[...TRUNCATED DUE TO CONTEXT LIMIT...]"
+        
+        processed_messages.append({
+            "role": msg.get("role"),
+            "content": content
+        })
+
     payload = {
         "model": model_name,
-        "messages": messages,
+        "messages": processed_messages,
         "temperature": temperature if temperature is not None else agent.temperature,
-        "max_tokens": max_tokens if max_tokens is not None else min(agent.max_tokens, 512),
+        "max_tokens": max_tokens if max_tokens is not None else safe_max_tokens,
         "top_p": top_p if top_p is not None else agent.top_p,
         "stream": False,
     }
