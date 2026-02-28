@@ -11,6 +11,8 @@ import asyncio
 import json
 from datetime import datetime, timezone
 
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session
 from app.models import Agent, Task, TaskStep, LogEntry, TaskStrategy, TaskStatus, StepStatus, LogLevel
 from app.services.llm_client import chat_completion
