@@ -1,0 +1,230 @@
+.dashboard {
+    max-width: 1200px;
+}
+
+.loading-state {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: center;
+    padding: var(--space-2xl);
+    color: var(--text-muted);
+}
+
+.ws-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* ===== Stats Grid ===== */
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--space-md);
+    margin-bottom: var(--space-xl);
+}
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: var(--space-lg);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
+.agents-icon {
+    background: rgba(99, 102, 241, 0.15);
+    color: #818cf8;
+}
+
+.online-icon {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+}
+
+.running-icon {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+}
+
+.done-icon {
+    background: rgba(59, 130, 246, 0.15);
+    color: #60a5fa;
+}
+
+.stat-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* ===== Dashboard Grid ===== */
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg);
+}
+
+.dashboard-section h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: var(--space-md);
+    color: var(--text-secondary);
+}
+
+.dashboard-section.full-width {
+    grid-column: 1 / -1;
+}
+
+/* ===== Agent Status ===== */
+
+.agent-status-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.agent-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.agent-status-row:last-child {
+    border-bottom: none;
+}
+
+.agent-status-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.agent-status-name {
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.agent-status-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.8rem;
+}
+
+/* ===== Live Feed ===== */
+
+.live-feed {
+    max-height: 300px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.feed-item {
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    display: flex;
+    gap: 10px;
+    background: var(--bg-input);
+}
+
+.feed-source {
+    color: var(--color-primary-light);
+    font-weight: 600;
+    min-width: 80px;
+}
+
+.feed-message {
+    color: var(--text-secondary);
+}
+
+.feed-item.level-error {
+    border-left: 3px solid var(--color-danger);
+}
+
+.feed-item.level-warning {
+    border-left: 3px solid var(--color-warning);
+}
+
+.feed-item.level-agent {
+    border-left: 3px solid var(--color-success);
+}
+
+.feed-item.level-info {
+    border-left: 3px solid var(--color-info);
+}
+
+/* ===== Tasks Table ===== */
+
+.tasks-table {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.task-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.875rem;
+}
+
+.task-row:last-child {
+    border-bottom: none;
+}
+
+.task-id {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    min-width: 40px;
+}
+
+.task-prompt {
+    flex: 1;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}

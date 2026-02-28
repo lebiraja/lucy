@@ -1,0 +1,115 @@
+.agent-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.agent-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--gradient-primary);
+    opacity: 0.5;
+    transition: opacity var(--transition-normal);
+}
+
+.agent-card.online::before {
+    background: var(--gradient-success);
+    opacity: 1;
+}
+
+.agent-card.offline::before {
+    background: var(--gradient-danger);
+    opacity: 1;
+}
+
+.agent-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-md);
+}
+
+.agent-card-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.agent-card-title h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.agent-card-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.agent-card-actions .danger-hover:hover {
+    color: var(--color-danger) !important;
+    border-color: var(--color-danger) !important;
+}
+
+.agent-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.agent-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.meta-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.meta-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+}
+
+.meta-value {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.meta-value.mono {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+}
+
+.agent-params {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.param-chip {
+    padding: 2px 8px;
+    background: var(--bg-input);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+}
+
+.agent-health-info {
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--border-color);
+}

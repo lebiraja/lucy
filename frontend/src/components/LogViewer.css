@@ -1,0 +1,102 @@
+.log-viewer {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+}
+
+.log-header h3 {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.log-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+.log-container {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: var(--space-sm);
+}
+
+.log-empty {
+    padding: var(--space-xl);
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.log-entry {
+    display: flex;
+    gap: 10px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.5;
+    transition: background var(--transition-fast);
+}
+
+.log-entry:hover {
+    background: var(--bg-input);
+}
+
+.log-time {
+    color: var(--text-muted);
+    min-width: 70px;
+    flex-shrink: 0;
+}
+
+.log-level {
+    min-width: 55px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.log-source {
+    color: var(--color-primary-light);
+    min-width: 100px;
+    flex-shrink: 0;
+}
+
+.log-message {
+    color: var(--text-secondary);
+    word-break: break-word;
+}
+
+/* Level colors */
+.log-info .log-level {
+    color: var(--color-info);
+}
+
+.log-error .log-level {
+    color: var(--color-danger);
+}
+
+.log-error .log-message {
+    color: #fca5a5;
+}
+
+.log-warning .log-level {
+    color: var(--color-warning);
+}
+
+.log-agent .log-level {
+    color: var(--color-success);
+}
+
+.log-debug .log-level {
+    color: var(--text-muted);
+}
