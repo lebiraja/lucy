@@ -48,15 +48,23 @@
 
 .agent-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
     gap: var(--space-lg);
 }
 
 .empty-state {
     grid-column: 1 / -1;
     text-align: center;
-    padding: var(--space-2xl);
+    padding: 60px 40px;
     color: var(--text-muted);
+    background: var(--bg-card);
+    border: 2px dashed var(--border-color);
+    border-radius: var(--border-radius);
+}
+
+.empty-state p:first-child {
+    font-size: 1.1rem;
+    margin-bottom: 6px;
 }
 
 .text-muted {
@@ -64,7 +72,7 @@
     font-size: 0.85rem;
 }
 
-/* ===== Form Overlay ===== */
+/* ===== Form Overlay — fixed modal with proper scroll ===== */
 
 .agent-form-overlay {
     position: fixed;
@@ -79,27 +87,35 @@
 }
 
 .agent-form {
-    width: 600px;
-    max-height: 90vh;
-    overflow-y: auto;
+    width: 560px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
     animation: fadeIn 0.25s ease;
 }
 
 .agent-form h2 {
-    font-size: 1.2rem;
-    margin-bottom: var(--space-lg);
+    font-size: 1.1rem;
+    margin-bottom: var(--space-sm);
+    flex-shrink: 0;
+}
+
+.form-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
 }
 
 .form-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--space-md);
+    gap: 10px 14px;
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 3px;
 }
 
 .form-group.full-width {
@@ -107,18 +123,29 @@
 }
 
 .form-group label {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
 
-.checkbox-group {
+.form-group input,
+.form-group select,
+.form-group textarea {
+    padding: 7px 10px;
+    font-size: 0.85rem;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 44px;
+}
+
+.checkbox-group-row {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding-top: 8px;
+    gap: 20px;
+    padding-top: 2px;
 }
 
 .checkbox-label {
@@ -126,21 +153,104 @@
     align-items: center;
     gap: 8px;
     cursor: pointer;
-    font-size: 0.875rem;
+    font-size: 0.82rem;
     color: var(--text-secondary);
 }
 
 .checkbox-label input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
     accent-color: var(--color-primary);
 }
+
+/* ===== Advanced Section ===== */
+
+.advanced-section {
+    margin-top: 10px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 6px;
+}
+
+.advanced-toggle {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 0;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.advanced-toggle::-webkit-details-marker {
+    display: none;
+}
+
+.advanced-toggle:hover {
+    color: var(--text-secondary);
+}
+
+.advanced-grid {
+    margin-top: 8px;
+}
+
+/* ===== Sticky Form Footer ===== */
 
 .form-actions {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
-    margin-top: var(--space-lg);
-    padding-top: var(--space-lg);
+    padding-top: 12px;
+    margin-top: 8px;
     border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+
+/* ===== Endpoint Detection ===== */
+
+.endpoint-row {
+    display: flex;
+    gap: 8px;
+}
+
+.endpoint-input {
+    flex: 1;
+}
+
+.detect-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.probe-result {
+    font-size: 0.76rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-top: 3px;
+}
+
+.probe-success {
+    background: rgba(16, 185, 129, 0.1);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.probe-error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+input.detected {
+    border-color: var(--color-success);
+    color: #34d399;
+}
+
+.label-hint {
+    font-weight: 400;
+    text-transform: none;
+    color: var(--text-muted);
+    font-size: 0.62rem;
+    letter-spacing: normal;
 }

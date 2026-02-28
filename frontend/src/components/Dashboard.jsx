@@ -3,6 +3,9 @@ import { apiGet } from '../hooks/useApi';
 import { useWebSocket } from '../hooks/useWebSocket';
 import './Dashboard.css';
 
+const ROLE_LABELS = { ceo: 'CEO', cto: 'CTO', manager: 'Manager', employee: 'Employee' };
+const ROLE_COLORS = { ceo: 'badge-gold', cto: 'badge-purple', manager: 'badge-info', employee: 'badge-default' };
+
 export default function Dashboard() {
     const [agents, setAgents] = useState([]);
     const [tasks, setTasks] = useState([]);
@@ -20,7 +23,6 @@ export default function Dashboard() {
                 setAgents(agentsData);
                 setTasks(tasksData);
 
-                // Check health
                 try {
                     const healthData = await apiGet('/agents/health');
                     const map = {};
@@ -37,9 +39,17 @@ export default function Dashboard() {
 
     const onlineCount = Object.values(healthMap).filter(h => h.is_online).length;
     const totalAgents = agents.length;
+    const warmCount = agents.filter(a => a.is_warm).length;
+    const activeCount = agents.filter(a => a.operational_status === 'active').length;
     const completedTasks = tasks.filter(t => t.status === 'completed').length;
     const runningTasks = tasks.filter(t => t.status === 'running').length;
     const recentLogs = messages.slice(-15);
+
+    // Group agents by role
+    const ceos = agents.filter(a => a.role === 'ceo');
+    const ctos = agents.filter(a => a.role === 'cto');
+    const managers = agents.filter(a => a.role === 'manager');
+    const employees = agents.filter(a => a.role === 'employee');
 
     if (loading) {
         return (
@@ -79,43 +89,56 @@ export default function Dashboard() {
                     </div>
                 </div>
                 <div className="stat-card card">
-                    <div className="stat-icon running-icon">▶</div>
+                    <div className="stat-icon warm-icon">🔥</div>
                     <div className="stat-info">
-                        <span className="stat-value">{runningTasks}</span>
-                        <span className="stat-label">Running Tasks</span>
+                        <span className="stat-value">{warmCount}</span>
+                        <span className="stat-label">Warm</span>
                     </div>
                 </div>
                 <div className="stat-card card">
-                    <div className="stat-icon done-icon">✓</div>
+                    <div className="stat-icon running-icon">▶</div>
                     <div className="stat-info">
-                        <span className="stat-value">{completedTasks}</span>
-                        <span className="stat-label">Completed</span>
+                        <span className="stat-value">{runningTasks}</span>
+                        <span className="stat-label">Running</span>
                     </div>
                 </div>
             </div>
 
             <div className="dashboard-grid">
-                {/* Agent Status */}
+                {/* Agent Hierarchy */}
                 <div className="dashboard-section card">
-                    <h2>Agent Status</h2>
-                    <div className="agent-status-list">
-                        {agents.length === 0 && <p className="text-muted">No agents configured</p>}
-                        {agents.map(agent => {
-                            const health = healthMap[agent.id];
-                            return (
-                                <div key={agent.id} className="agent-status-row">
-                                    <div className="agent-status-info">
-                                        <span className={`status-dot ${health?.is_online ? 'online' : 'offline'}`}></span>
-                                        <span className="agent-status-name">{agent.name}</span>
-                                        {agent.is_orchestrator && <span className="badge badge-purple">Orch</span>}
-                                    </div>
-                                    <div className="agent-status-meta">
-                                        <span className="text-muted">{agent.role}</span>
-                                        {health?.is_online && <span className="badge badge-success">{health.latency_ms}ms</span>}
-                                    </div>
+                    <h2>Agent Hierarchy</h2>
+                    <div className="hierarchy-list">
+                        {[
+                            { label: 'CEO', agents: ceos, color: 'gold' },
+                            { label: 'CTO', agents: ctos, color: 'purple' },
+                            { label: 'Managers', agents: managers, color: 'blue' },
+                            { label: 'Employees', agents: employees, color: 'gray' },
+                        ].map(group => (
+                            <div key={group.label} className="hierarchy-group">
+                                <div className="hierarchy-label">
+                                    <span className={`hierarchy-dot dot-${group.color}`}></span>
+                                    {group.label} <span className="hierarchy-count">({group.agents.length})</span>
                                 </div>
-                            );
-                        })}
+                                {group.agents.map(agent => {
+                                    const health = healthMap[agent.id];
+                                    return (
+                                        <div key={agent.id} className="agent-status-row">
+                                            <div className="agent-status-info">
+                                                <span className={`status-dot ${health?.is_online ? 'online' : 'offline'}`}></span>
+                                                <span className="agent-status-name">{agent.name}</span>
+                                                {agent.is_orchestrator && <span className="badge badge-purple" style={{ fontSize: '0.6rem', padding: '1px 5px' }}>Brain</span>}
+                                            </div>
+                                            <div className="agent-status-meta">
+                                                <span className="text-muted">{agent.state}</span>
+                                                {health?.is_online && <span className="badge badge-success">{health.latency_ms}ms</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {group.agents.length === 0 && <div className="no-agents-hint">No {group.label.toLowerCase()} assigned</div>}
+                            </div>
+                        ))}
                     </div>
                 </div>
 

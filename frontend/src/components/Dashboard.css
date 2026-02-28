@@ -137,6 +137,66 @@
     font-size: 0.8rem;
 }
 
+/* ===== Hierarchy Groups ===== */
+
+.hierarchy-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.hierarchy-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.hierarchy-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-bottom: 4px;
+}
+
+.hierarchy-count {
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.hierarchy-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.dot-gold {
+    background: #fbbf24;
+}
+
+.dot-purple {
+    background: #a78bfa;
+}
+
+.dot-blue {
+    background: #60a5fa;
+}
+
+.dot-gray {
+    background: #6b7280;
+}
+
+.no-agents-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding-left: 14px;
+    font-style: italic;
+}
+
 /* ===== Live Feed ===== */
 
 .live-feed {

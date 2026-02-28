@@ -1,6 +1,8 @@
 .agent-card {
     position: relative;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .agent-card::before {
@@ -29,40 +31,100 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: var(--space-md);
+    margin-bottom: var(--space-sm);
 }
 
 .agent-card-title {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
 .agent-card-title h3 {
-    font-size: 1.05rem;
+    font-size: 1rem;
     font-weight: 600;
 }
 
-.agent-card-actions {
+.agent-card-badges {
     display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+/* ===== Status Row ===== */
+
+.status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: var(--space-sm);
+}
+
+.status-chip {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--color-primary-light);
+}
+
+.status-chip[data-status="active"] {
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+}
+
+.status-chip[data-status="paused"] {
+    background: rgba(245, 158, 11, 0.12);
+    color: #fbbf24;
+}
+
+.status-chip[data-status="stopped"] {
+    background: rgba(107, 114, 128, 0.15);
+    color: #9ca3af;
+}
+
+.status-chip[data-status="failed"] {
+    background: rgba(239, 68, 68, 0.12);
+    color: #f87171;
+}
+
+.status-chip[data-status="inactive"] {
+    background: rgba(107, 114, 128, 0.1);
+    color: #6b7280;
+}
+
+.state-chip {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
     gap: 4px;
 }
 
-.agent-card-actions .danger-hover:hover {
-    color: var(--color-danger) !important;
-    border-color: var(--color-danger) !important;
+.state-icon {
+    font-size: 0.8rem;
 }
+
+.warm-badge {
+    font-size: 0.9rem;
+    cursor: help;
+}
+
+/* ===== Card Body ===== */
 
 .agent-card-body {
     display: flex;
     flex-direction: column;
-    gap: var(--space-md);
+    gap: var(--space-sm);
+    flex: 1;
 }
 
 .agent-meta {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .meta-item {
@@ -73,7 +135,7 @@
 }
 
 .meta-label {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -81,7 +143,7 @@
 }
 
 .meta-value {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     color: var(--text-secondary);
     text-align: right;
     overflow: hidden;
@@ -91,25 +153,43 @@
 
 .meta-value.mono {
     font-family: var(--font-mono);
-    font-size: 0.8rem;
-}
-
-.agent-params {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.param-chip {
-    padding: 2px 8px;
-    background: var(--bg-input);
-    border-radius: 4px;
     font-size: 0.75rem;
-    font-family: var(--font-mono);
-    color: var(--text-muted);
 }
 
 .agent-health-info {
+    padding-top: var(--space-xs);
+}
+
+/* ===== Card Footer ===== */
+
+.agent-card-footer {
+    display: flex;
+    gap: 4px;
+    align-items: center;
     padding-top: var(--space-sm);
+    margin-top: var(--space-sm);
     border-top: 1px solid var(--border-color);
+}
+
+.agent-card-footer .danger-hover:hover {
+    color: var(--color-danger) !important;
+    border-color: var(--color-danger) !important;
+}
+
+.card-spacer {
+    flex: 1;
+}
+
+/* ===== Badge Colors ===== */
+
+.badge-gold {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.badge-default {
+    background: rgba(107, 114, 128, 0.12);
+    color: #9ca3af;
+    border: 1px solid rgba(107, 114, 128, 0.2);
 }

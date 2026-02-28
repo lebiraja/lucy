@@ -81,3 +81,32 @@ async def check_health(endpoint: str) -> tuple[bool, float | None, str | None]:
         return False, None, f"HTTP {e.response.status_code}: {e.response.text[:200]}"
     except Exception as e:
         return False, None, str(e)
+
+
+async def fetch_model_info(endpoint: str) -> dict:
+    """
+    Fetch model information from a vLLM endpoint via /v1/models.
+
+    Returns:
+        Dict with 'model_name' and optionally other info,
+        or raises an exception if the endpoint is unreachable.
+    """
+    url = f"{endpoint.rstrip('/')}/v1/models"
+
+    async with httpx.AsyncClient(timeout=settings.health_check_timeout) as client:
+        response = await client.get(url)
+        response.raise_for_status()
+
+    data = response.json()
+    models = data.get("data", [])
+
+    if not models:
+        raise ValueError("No models found at this endpoint")
+
+    # vLLM typically serves one model per endpoint
+    model_id = models[0].get("id", "unknown")
+    return {
+        "model_name": model_id,
+        "models": [m.get("id") for m in models],
+    }
+
