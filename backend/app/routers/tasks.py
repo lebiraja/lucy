@@ -63,7 +63,7 @@ async def create_task(data: TaskCreate, db: AsyncSession = Depends(get_db)):
         status=TaskStatus.PENDING,
     )
     db.add(task)
-    await db.flush()
+    await db.commit()
 
     # Re-fetch with eager loading to avoid MissingGreenlet on lazy-load
     result = await db.execute(
