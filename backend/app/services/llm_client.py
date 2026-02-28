@@ -47,7 +47,7 @@ async def chat_completion(
         "model": model_name,
         "messages": messages,
         "temperature": temperature if temperature is not None else agent.temperature,
-        "max_tokens": max_tokens if max_tokens is not None else agent.max_tokens,
+        "max_tokens": max_tokens if max_tokens is not None else min(agent.max_tokens, 512),
         "top_p": top_p if top_p is not None else agent.top_p,
         "stream": False,
     }
