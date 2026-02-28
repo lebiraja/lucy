@@ -3,7 +3,8 @@ import './Layout.css';
 const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: '◈' },
     { id: 'agents', label: 'Agents', icon: '⬡' },
-    { id: 'tasks', label: 'Tasks', icon: '▶' },
+    { id: 'tasks', label: 'New Task', icon: '▶' },
+    { id: 'progress', label: 'Progress', icon: '📊' },
 ];
 
 export default function Layout({ activeTab, onTabChange, children }) {

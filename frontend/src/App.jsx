@@ -3,6 +3,7 @@ import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import AgentManager from './components/AgentManager';
 import TaskCreator from './components/TaskCreator';
+import Progress from './components/Progress';
 import './App.css';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
       case 'dashboard': return <Dashboard />;
       case 'agents': return <AgentManager />;
       case 'tasks': return <TaskCreator />;
+      case 'progress': return <Progress />;
       default: return <Dashboard />;
     }
   };

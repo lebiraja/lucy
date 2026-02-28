@@ -7,8 +7,8 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db, async_session
-from app.models import Agent, Task, TaskStatus
-from app.schemas import TaskCreate, TaskResponse
+from app.models import Agent, Task, TaskStatus, LogEntry
+from app.schemas import TaskCreate, TaskResponse, LogEntryResponse
 from app.services.orchestrator import execute_task
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
@@ -129,3 +129,15 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_db)):
             step_resp.agent_role = agent.role.value if agent else None
 
     return task_resp
+
+
+@router.get("/{task_id}/logs", response_model=list[LogEntryResponse])
+async def get_task_logs(task_id: int, db: AsyncSession = Depends(get_db)):
+    """Get all logs for a specific task."""
+    result = await db.execute(
+        select(LogEntry)
+        .where(LogEntry.task_id == task_id)
+        .order_by(LogEntry.timestamp.asc())
+    )
+    logs = result.scalars().all()
+    return logs
