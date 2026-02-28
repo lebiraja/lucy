@@ -8,7 +8,7 @@ import './TaskCreator.css';
 export default function TaskCreator() {
     const [agents, setAgents] = useState([]);
     const [prompt, setPrompt] = useState('');
-    const [strategy, setStrategy] = useState('parallel');
+    const [strategy, setStrategy] = useState('council');
     const [selectedAgentIds, setSelectedAgentIds] = useState([]);
     const [useAll, setUseAll] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -101,6 +101,7 @@ export default function TaskCreator() {
                     <div className="form-group">
                         <label>Strategy</label>
                         <select value={strategy} onChange={e => setStrategy(e.target.value)}>
+                            <option value="council">Council — CEO-led discussion</option>
                             <option value="sequential">Sequential — Chain agents</option>
                             <option value="parallel">Parallel — Fan-out & aggregate</option>
                             <option value="dynamic">Dynamic — Lucy decides</option>
@@ -157,7 +158,14 @@ export default function TaskCreator() {
                     {activeTask && activeTask.status === 'running' && (
                         <div className="running-indicator card">
                             <span className="spinner"></span>
-                            <span>Task #{activeTask.id} is running...</span>
+                            <div className="running-details">
+                                <span>Task #{activeTask.id} is running...</span>
+                                {strategy === 'council' && messages.length > 0 && (
+                                    <span className="current-stage">
+                                        {messages.findLast(m => m.message?.includes('STAGE'))?.message?.split(':')[0] || 'Starting...'}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>

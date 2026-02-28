@@ -100,3 +100,16 @@
 .log-debug .log-level {
     color: var(--text-muted);
 }
+
+/* Stage marker highlighting */
+.log-stage-marker {
+    background: rgba(139, 92, 246, 0.08);
+    border-left: 2px solid var(--accent);
+    margin: 4px 0;
+    padding: 6px 8px;
+}
+
+.log-stage-marker .log-message {
+    color: var(--text-primary);
+    font-weight: 600;
+}

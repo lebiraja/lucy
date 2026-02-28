@@ -61,6 +61,7 @@ class TaskStrategy(str, enum.Enum):
     SEQUENTIAL = "sequential"
     PARALLEL = "parallel"
     DYNAMIC = "dynamic"
+    COUNCIL = "council"
 
 
 class TaskStatus(str, enum.Enum):
@@ -179,6 +180,7 @@ class TaskStep(Base):
     response = Column(Text, nullable=True)
     duration_ms = Column(Integer, nullable=True)
     status = Column(Enum(StepStatus), default=StepStatus.PENDING, nullable=False)
+    step_label = Column(String(50), nullable=True)  # "opinion", "review", "synthesis"
 
     created_at = Column(
         DateTime(timezone=True),

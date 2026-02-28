@@ -111,8 +111,10 @@ class TaskStepResponse(BaseModel):
     response: str | None
     duration_ms: int | None
     status: StepStatus
+    step_label: str | None = None
     created_at: datetime
     agent_name: str | None = None
+    agent_role: str | None = None
 
     model_config = {"from_attributes": True}
 

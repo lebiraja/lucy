@@ -38,6 +38,7 @@ async def _run_step(
     agent: Agent,
     prompt: str,
     step_order: int,
+    step_label: str | None = None,
 ) -> TaskStep:
     """Execute a single step: send prompt to agent, record result."""
     step = TaskStep(
@@ -46,6 +47,7 @@ async def _run_step(
         step_order=step_order,
         input_prompt=prompt,
         status=StepStatus.RUNNING,
+        step_label=step_label,
     )
     session.add(step)
     await session.flush()
@@ -269,6 +271,188 @@ async def execute_dynamic(session: AsyncSession, task: Task, agents: list[Agent]
         await execute_parallel(session, task, non_orch_agents)
 
 
+# ---------- Role-aware prompts for council ----------
+
+ROLE_SYSTEM_PROMPTS = {
+    "ceo": (
+        "You are a CEO-level strategic AI. Analyze from a high-level business and strategic perspective. "
+        "Focus on vision, priorities, risks, resource allocation, and overall direction."
+    ),
+    "cto": (
+        "You are a CTO-level technical AI. Analyze from a deep technical perspective. "
+        "Focus on architecture, technology choices, scalability, security, and engineering trade-offs."
+    ),
+    "manager": (
+        "You are a Manager-level AI responsible for execution. Analyze from an implementation perspective. "
+        "Focus on timelines, team capacity, milestones, dependencies, and practical execution steps."
+    ),
+    "employee": (
+        "You are a specialist AI contributor. Provide detailed, hands-on analysis. "
+        "Focus on specifics, implementation details, and ground-level insights."
+    ),
+}
+
+
+async def execute_council(session: AsyncSession, task: Task, agents: list[Agent]):
+    """
+    Council strategy: 4-stage CEO-led hierarchical discussion.
+
+    Stage 1 — Individual opinions (parallel, role-aware)
+    Stage 2 — Cross-review & debate (parallel)
+    Stage 3 — CEO synthesis (single)
+    Stage 4 — Final plan output
+    """
+    # Find CEO (orchestrator)
+    ceo_agent = next((a for a in agents if a.is_orchestrator), None)
+    if not ceo_agent:
+        ceo_agent = next((a for a in agents if a.role.value == "ceo"), None)
+    if not ceo_agent:
+        await _log(session, task.id, "No CEO/orchestrator found — falling back to parallel", level="warning")
+        return await execute_parallel(session, task, agents)
+
+    all_agents = agents
+    step_counter = 0
+
+    # =========================================================
+    # STAGE 1 — Individual Opinions (parallel, role-aware)
+    # =========================================================
+    await _log(session, task.id, "📋 STAGE 1: Collecting individual opinions from all agents...")
+
+    async def get_opinion(agent, order):
+        role_prompt = ROLE_SYSTEM_PROMPTS.get(agent.role.value, ROLE_SYSTEM_PROMPTS["employee"])
+        prompt = (
+            f"{role_prompt}\n\n"
+            f"You are {agent.name} (Role: {agent.role.value.upper()}).\n\n"
+            f"Please provide your expert analysis of the following:\n\n"
+            f"{task.prompt}"
+        )
+        return await _run_step(session, task, agent, prompt, step_order=order, step_label="opinion")
+
+    opinion_coros = [get_opinion(agent, i) for i, agent in enumerate(all_agents)]
+    opinion_steps = await asyncio.gather(*opinion_coros, return_exceptions=True)
+    step_counter = len(all_agents)
+
+    # Collect successful opinions
+    opinions = []
+    for i, step in enumerate(opinion_steps):
+        if isinstance(step, Exception):
+            await _log(session, task.id, f"Agent {all_agents[i].name} failed in Stage 1: {step}", level="error")
+            continue
+        if step.status == StepStatus.COMPLETED:
+            opinions.append({
+                "agent": all_agents[i],
+                "response": step.response,
+            })
+
+    if not opinions:
+        task.status = TaskStatus.FAILED
+        task.final_output = "All agents failed to provide opinions."
+        await _log(session, task.id, "Stage 1 failed — no responses", level="error")
+        return
+
+    await _log(session, task.id, f"✓ Stage 1 complete — {len(opinions)} opinions collected")
+
+    # =========================================================
+    # STAGE 2 — Cross-Review & Debate (parallel)
+    # =========================================================
+    await _log(session, task.id, "🔍 STAGE 2: Cross-review — agents evaluating each other's responses...")
+
+    async def review_others(agent, order):
+        # Build context of all OTHER agents' opinions
+        others_text = ""
+        for op in opinions:
+            if op["agent"].id != agent.id:
+                others_text += (
+                    f"--- {op['agent'].name} ({op['agent'].role.value.upper()}) ---\n"
+                    f"{op['response']}\n\n"
+                )
+
+        # Also include this agent's own opinion for reference
+        own_opinion = next((op["response"] for op in opinions if op["agent"].id == agent.id), "")
+
+        prompt = (
+            f"You are {agent.name} (Role: {agent.role.value.upper()}).\n\n"
+            f"ORIGINAL QUESTION:\n{task.prompt}\n\n"
+            f"YOUR PREVIOUS RESPONSE:\n{own_opinion}\n\n"
+            f"OTHER TEAM MEMBERS' RESPONSES:\n{others_text}\n"
+            f"Please review your teammates' responses:\n"
+            f"1. What do you agree with? What are the strongest points?\n"
+            f"2. What do you disagree with or think is missing?\n"
+            f"3. What improvements or additions would you suggest?\n"
+            f"4. Any risks or concerns the team should consider?\n\n"
+            f"Be constructive and specific. This is a team discussion."
+        )
+        return await _run_step(session, task, agent, prompt, step_order=order, step_label="review")
+
+    review_coros = [review_others(agent, step_counter + i) for i, agent in enumerate(all_agents)]
+    review_steps = await asyncio.gather(*review_coros, return_exceptions=True)
+    step_counter += len(all_agents)
+
+    # Collect successful reviews
+    reviews = []
+    for i, step in enumerate(review_steps):
+        if isinstance(step, Exception):
+            continue
+        if step.status == StepStatus.COMPLETED:
+            reviews.append({
+                "agent": all_agents[i],
+                "response": step.response,
+            })
+
+    await _log(session, task.id, f"✓ Stage 2 complete — {len(reviews)} reviews collected")
+
+    # =========================================================
+    # STAGE 3 — CEO Synthesis
+    # =========================================================
+    await _log(session, task.id, "🧠 STAGE 3: CEO synthesizing all opinions and reviews into final plan...")
+
+    # Build comprehensive context for CEO
+    opinions_text = "\n\n".join([
+        f"=== {op['agent'].name} ({op['agent'].role.value.upper()}) — OPINION ===\n{op['response']}"
+        for op in opinions
+    ])
+
+    reviews_text = "\n\n".join([
+        f"=== {rev['agent'].name} ({rev['agent'].role.value.upper()}) — REVIEW ===\n{rev['response']}"
+        for rev in reviews
+    ])
+
+    synthesis_prompt = (
+        f"You are {ceo_agent.name}, the CEO and leader of this AI team.\n\n"
+        f"Your team has been asked the following question:\n"
+        f"ORIGINAL QUESTION: {task.prompt}\n\n"
+        f"STAGE 1 — INDIVIDUAL OPINIONS:\n{opinions_text}\n\n"
+        f"STAGE 2 — CROSS-REVIEWS & DEBATE:\n{reviews_text}\n\n"
+        f"As the CEO, synthesize all the opinions and reviews into a single, comprehensive, "
+        f"actionable final plan. Consider:\n"
+        f"- The strongest ideas from each team member\n"
+        f"- Points of agreement across the team\n"
+        f"- Constructive criticisms and how to address them\n"
+        f"- A clear, structured plan with priorities\n\n"
+        f"Produce the definitive team answer that represents the collective wisdom of your entire team."
+    )
+
+    synth_step = await _run_step(
+        session, task, ceo_agent, synthesis_prompt, step_order=step_counter, step_label="synthesis"
+    )
+
+    # =========================================================
+    # STAGE 4 — Final Output
+    # =========================================================
+    if synth_step.status == StepStatus.COMPLETED:
+        task.final_output = synth_step.response
+        task.status = TaskStatus.COMPLETED
+        task.completed_at = datetime.now(timezone.utc)
+        await _log(session, task.id, "✅ Council discussion complete — CEO has produced the final plan")
+    else:
+        # Fallback: concatenate all opinions
+        task.final_output = "CEO synthesis failed. Individual opinions:\n\n" + "\n\n---\n\n".join(
+            f"**{op['agent'].name}** ({op['agent'].role.value.upper()}):\n{op['response']}" for op in opinions
+        )
+        task.status = TaskStatus.FAILED
+        await _log(session, task.id, "CEO synthesis failed — returning raw opinions", level="error")
+
+
 async def execute_task(session: AsyncSession, task: Task, agents: list[Agent]):
     """Main entry point — dispatch to the correct strategy."""
     task.status = TaskStatus.RUNNING
@@ -283,6 +467,8 @@ async def execute_task(session: AsyncSession, task: Task, agents: list[Agent]):
             await execute_parallel(session, task, agents)
         elif task.strategy == TaskStrategy.DYNAMIC:
             await execute_dynamic(session, task, agents)
+        elif task.strategy == TaskStrategy.COUNCIL:
+            await execute_council(session, task, agents)
         else:
             task.status = TaskStatus.FAILED
             task.final_output = f"Unknown strategy: {task.strategy}"

@@ -1,6 +1,13 @@
 import { useEffect, useRef } from 'react';
 import './LogViewer.css';
 
+const ROLE_BADGE_COLORS = {
+    ceo: '#e5a300',
+    cto: '#a855f7',
+    manager: '#3b82f6',
+    employee: '#64748b',
+};
+
 export default function LogViewer({ messages }) {
     const bottomRef = useRef(null);
 
@@ -18,6 +25,8 @@ export default function LogViewer({ messages }) {
         }
     };
 
+    const isStageMarker = (msg) => msg.message?.includes('STAGE') || msg.message?.startsWith('✓') || msg.message?.startsWith('✅');
+
     return (
         <div className="log-viewer">
             <div className="log-header">
@@ -29,7 +38,7 @@ export default function LogViewer({ messages }) {
                     <div className="log-empty">Waiting for task execution...</div>
                 )}
                 {messages.map((msg, i) => (
-                    <div key={i} className={`log-entry ${getLevelClass(msg.level)}`}>
+                    <div key={i} className={`log-entry ${getLevelClass(msg.level)} ${isStageMarker(msg) ? 'log-stage-marker' : ''}`}>
                         <span className="log-time">
                             {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '--:--:--'}
                         </span>

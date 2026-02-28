@@ -95,7 +95,7 @@ async def list_tasks(
     )
     tasks = result.scalars().unique().all()
 
-    # Enrich steps with agent names
+    # Enrich steps with agent names and roles
     response_tasks = []
     for task in tasks:
         task_dict = TaskResponse.model_validate(task)
@@ -103,6 +103,7 @@ async def list_tasks(
             if step_resp.agent_id:
                 agent = await db.get(Agent, step_resp.agent_id)
                 step_resp.agent_name = agent.name if agent else None
+                step_resp.agent_role = agent.role.value if agent else None
         response_tasks.append(task_dict)
 
     return response_tasks
@@ -125,5 +126,6 @@ async def get_task(task_id: int, db: AsyncSession = Depends(get_db)):
         if step_resp.agent_id:
             agent = await db.get(Agent, step_resp.agent_id)
             step_resp.agent_name = agent.name if agent else None
+            step_resp.agent_role = agent.role.value if agent else None
 
     return task_resp
