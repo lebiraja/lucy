@@ -50,7 +50,7 @@ async def _run_step(
     session.add(step)
     await session.flush()
 
-    await _log(session, task.id, f"Sending prompt to [{agent.name}] ({agent.model_name})...", source=agent.name)
+    await _log(session, task.id, f"Sending prompt to [{agent.name}] ({agent.model_name or 'auto'})...", source=agent.name)
 
     try:
         response_text, duration_ms = await chat_completion(
@@ -130,7 +130,7 @@ async def execute_parallel(session: AsyncSession, task: Task, agents: list[Agent
         if step.status == StepStatus.COMPLETED:
             responses.append({
                 "agent": agents[i].name,
-                "model": agents[i].model_name,
+                "model": agents[i].model_name or "unknown",
                 "role": agents[i].role,
                 "response": step.response,
             })
@@ -210,7 +210,7 @@ async def execute_dynamic(session: AsyncSession, task: Task, agents: list[Agent]
             agent_catalog.append({
                 "id": a.id,
                 "name": a.name,
-                "model": a.model_name,
+                "model": a.model_name or "unknown",
                 "role": a.role,
                 "description": a.description or "No description",
             })

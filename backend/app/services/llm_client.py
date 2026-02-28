@@ -34,8 +34,17 @@ async def chat_completion(
     """
     url = f"{agent.endpoint.rstrip('/')}/v1/chat/completions"
 
+    # If model_name is not set, try to detect it
+    model_name = agent.model_name
+    if not model_name:
+        try:
+            info = await fetch_model_info(agent.endpoint)
+            model_name = info["model_name"]
+        except Exception:
+            model_name = "default"
+
     payload = {
-        "model": agent.model_name,
+        "model": model_name,
         "messages": messages,
         "temperature": temperature if temperature is not None else agent.temperature,
         "max_tokens": max_tokens if max_tokens is not None else agent.max_tokens,

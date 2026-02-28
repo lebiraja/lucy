@@ -64,7 +64,14 @@ async def create_task(data: TaskCreate, db: AsyncSession = Depends(get_db)):
     )
     db.add(task)
     await db.flush()
-    await db.refresh(task)
+
+    # Re-fetch with eager loading to avoid MissingGreenlet on lazy-load
+    result = await db.execute(
+        select(Task)
+        .options(selectinload(Task.steps))
+        .where(Task.id == task.id)
+    )
+    task = result.scalar_one()
 
     # Launch execution in background
     asyncio.create_task(_run_task_background(task.id, data.agent_ids))
