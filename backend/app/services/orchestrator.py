@@ -11,9 +11,7 @@ import asyncio
 import json
 from datetime import datetime, timezone
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
+from app.database import async_session
 from app.models import Agent, Task, TaskStep, LogEntry, TaskStrategy, TaskStatus, StepStatus, LogLevel
 from app.services.llm_client import chat_completion
 from app.services.logger import log_broadcaster
@@ -28,52 +26,59 @@ async def _log(session: AsyncSession, task_id: int, message: str, level: str = "
         message=message,
     )
     session.add(entry)
-    await session.flush()
+    await session.commit()
     await log_broadcaster.broadcast(message=message, level=level, source=source, task_id=task_id)
 
 
 async def _run_step(
-    session: AsyncSession,
-    task: Task,
+    task_id: int,
     agent: Agent,
     prompt: str,
     step_order: int,
     step_label: str | None = None,
-) -> TaskStep:
-    """Execute a single step: send prompt to agent, record result."""
-    step = TaskStep(
-        task_id=task.id,
-        agent_id=agent.id,
-        step_order=step_order,
-        input_prompt=prompt,
-        status=StepStatus.RUNNING,
-        step_label=step_label,
-    )
-    session.add(step)
-    await session.flush()
-
-    await _log(session, task.id, f"Sending prompt to [{agent.name}] ({agent.model_name or 'auto'})...", source=agent.name)
-
-    try:
-        response_text, duration_ms = await chat_completion(
-            agent=agent,
-            messages=[{"role": "user", "content": prompt}],
+) -> dict:
+    """Execute a single step using an isolated database session to allow safe concurrent execution."""
+    async with async_session() as step_session:
+        step = TaskStep(
+            task_id=task_id,
+            agent_id=agent.id,
+            step_order=step_order,
+            input_prompt=prompt,
+            status=StepStatus.RUNNING,
+            step_label=step_label,
         )
-        step.response = response_text
-        step.duration_ms = duration_ms
-        step.status = StepStatus.COMPLETED
-        await _log(
-            session, task.id,
-            f"[{agent.name}] responded in {duration_ms}ms ({len(response_text)} chars)",
-            source=agent.name, level="agent",
-        )
-    except Exception as e:
-        step.status = StepStatus.FAILED
-        step.response = f"ERROR: {str(e)}"
-        await _log(session, task.id, f"[{agent.name}] FAILED: {str(e)}", source=agent.name, level="error")
+        step_session.add(step)
+        await step_session.commit()
 
-    await session.flush()
-    return step
+        await _log(step_session, task_id, f"Sending prompt to [{agent.name}] ({agent.model_name or 'auto'})...", source=agent.name)
+
+        try:
+            # Re-fetch agent in this session for the LLM call to avoid DetachedInstanceError limits
+            local_agent = await step_session.get(Agent, agent.id)
+            response_text, duration_ms = await chat_completion(
+                agent=local_agent,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            
+            step.response = response_text
+            step.duration_ms = duration_ms
+            step.status = StepStatus.COMPLETED
+            await step_session.commit()
+            
+            await _log(
+                step_session, task_id,
+                f"[{agent.name}] responded in {duration_ms}ms ({len(response_text)} chars)",
+                source=agent.name, level="agent",
+            )
+            return {"status": StepStatus.COMPLETED, "response": response_text, "duration_ms": duration_ms}
+            
+        except Exception as e:
+            step.status = StepStatus.FAILED
+            step.response = f"ERROR: {str(e)}"
+            await step_session.commit()
+            
+            await _log(step_session, task_id, f"[{agent.name}] FAILED: {str(e)}", source=agent.name, level="error")
+            return {"status": StepStatus.FAILED, "response": f"ERROR: {str(e)}", "duration_ms": 0}
 
 
 async def execute_sequential(session: AsyncSession, task: Task, agents: list[Agent]):
@@ -87,19 +92,19 @@ async def execute_sequential(session: AsyncSession, task: Task, agents: list[Age
     final_response = ""
 
     for i, agent in enumerate(agents):
-        step = await _run_step(session, task, agent, accumulated, step_order=i)
+        step_result = await _run_step(task.id, agent, accumulated, step_order=i)
 
-        if step.status == StepStatus.FAILED:
+        if step_result["status"] == StepStatus.FAILED:
             await _log(session, task.id, f"Sequential chain broken at step {i + 1} ({agent.name})", level="error")
             task.status = TaskStatus.FAILED
-            task.final_output = f"Chain failed at step {i + 1} ({agent.name}): {step.response}"
+            task.final_output = f"Chain failed at step {i + 1} ({agent.name}): {step_result['response']}"
             return
 
-        final_response = step.response
+        final_response = step_result["response"]
         # Build context for next agent
         accumulated = (
             f"Original prompt: {task.prompt}\n\n"
-            f"Previous agent ({agent.name}) responded:\n{step.response}\n\n"
+            f"Previous agent ({agent.name}) responded:\n{step_result['response']}\n\n"
             f"Please continue building on this response."
         )
 
@@ -118,23 +123,23 @@ async def execute_parallel(session: AsyncSession, task: Task, agents: list[Agent
 
     # Fan-out to all agents concurrently
     async def run_agent(agent, order):
-        return await _run_step(session, task, agent, task.prompt, step_order=order)
+        return await _run_step(task.id, agent, task.prompt, step_order=order)
 
     tasks_coros = [run_agent(agent, i) for i, agent in enumerate(agents)]
     steps = await asyncio.gather(*tasks_coros, return_exceptions=True)
 
     # Collect successful responses
     responses = []
-    for i, step in enumerate(steps):
-        if isinstance(step, Exception):
-            await _log(session, task.id, f"Agent {agents[i].name} raised exception: {step}", level="error")
+    for i, step_result in enumerate(steps):
+        if isinstance(step_result, Exception):
+            await _log(session, task.id, f"Agent {agents[i].name} raised exception: {step_result}", level="error")
             continue
-        if step.status == StepStatus.COMPLETED:
+        if step_result["status"] == StepStatus.COMPLETED:
             responses.append({
                 "agent": agents[i].name,
                 "model": agents[i].model_name or "unknown",
                 "role": agents[i].role,
-                "response": step.response,
+                "response": step_result["response"],
             })
 
     if not responses:
@@ -167,11 +172,11 @@ async def execute_parallel(session: AsyncSession, task: Task, agents: list[Agent
         )
 
         synth_step = await _run_step(
-            session, task, orchestrator_agent, synthesis_prompt, step_order=len(agents)
+            task.id, orchestrator_agent, synthesis_prompt, step_order=len(agents)
         )
 
-        if synth_step.status == StepStatus.COMPLETED:
-            task.final_output = synth_step.response
+        if synth_step["status"] == StepStatus.COMPLETED:
+            task.final_output = synth_step["response"]
         else:
             # Fallback: concatenate all responses
             task.final_output = "\n\n---\n\n".join(
@@ -227,16 +232,16 @@ async def execute_dynamic(session: AsyncSession, task: Task, agents: list[Agent]
         f"Only respond with the JSON object, nothing else."
     )
 
-    routing_step = await _run_step(session, task, orchestrator_agent, routing_prompt, step_order=0)
+    routing_step = await _run_step(task.id, orchestrator_agent, routing_prompt, step_order=0)
 
-    if routing_step.status == StepStatus.FAILED:
+    if routing_step["status"] == StepStatus.FAILED:
         await _log(session, task.id, "Orchestrator failed to route — falling back to parallel", level="warning")
         return await execute_parallel(session, task, agents)
 
     # Parse routing decision
     try:
         # Try to extract JSON from the response
-        response_text = routing_step.response.strip()
+        response_text = routing_step["response"].strip()
         # Handle markdown code block wrapping
         if response_text.startswith("```"):
             lines = response_text.split("\n")
@@ -326,7 +331,7 @@ async def execute_council(session: AsyncSession, task: Task, agents: list[Agent]
             f"Please provide your expert analysis of the following:\n\n"
             f"{task.prompt}"
         )
-        return await _run_step(session, task, agent, prompt, step_order=order, step_label="opinion")
+        return await _run_step(task.id, agent, prompt, step_order=order, step_label="opinion")
 
     opinion_coros = [get_opinion(agent, i) for i, agent in enumerate(all_agents)]
     opinion_steps = await asyncio.gather(*opinion_coros, return_exceptions=True)
@@ -334,14 +339,14 @@ async def execute_council(session: AsyncSession, task: Task, agents: list[Agent]
 
     # Collect successful opinions
     opinions = []
-    for i, step in enumerate(opinion_steps):
-        if isinstance(step, Exception):
-            await _log(session, task.id, f"Agent {all_agents[i].name} failed in Stage 1: {step}", level="error")
+    for i, step_dict in enumerate(opinion_steps):
+        if isinstance(step_dict, Exception):
+            await _log(session, task.id, f"Agent {all_agents[i].name} failed in Stage 1: {step_dict}", level="error")
             continue
-        if step.status == StepStatus.COMPLETED:
+        if step_dict["status"] == StepStatus.COMPLETED:
             opinions.append({
                 "agent": all_agents[i],
-                "response": step.response,
+                "response": step_dict["response"],
             })
 
     if not opinions:
@@ -382,7 +387,7 @@ async def execute_council(session: AsyncSession, task: Task, agents: list[Agent]
             f"4. Any risks or concerns the team should consider?\n\n"
             f"Be constructive and specific. This is a team discussion."
         )
-        return await _run_step(session, task, agent, prompt, step_order=order, step_label="review")
+        return await _run_step(task.id, agent, prompt, step_order=order, step_label="review")
 
     review_coros = [review_others(agent, step_counter + i) for i, agent in enumerate(all_agents)]
     review_steps = await asyncio.gather(*review_coros, return_exceptions=True)
@@ -390,13 +395,13 @@ async def execute_council(session: AsyncSession, task: Task, agents: list[Agent]
 
     # Collect successful reviews
     reviews = []
-    for i, step in enumerate(review_steps):
-        if isinstance(step, Exception):
+    for i, step_dict in enumerate(review_steps):
+        if isinstance(step_dict, Exception):
             continue
-        if step.status == StepStatus.COMPLETED:
+        if step_dict["status"] == StepStatus.COMPLETED:
             reviews.append({
                 "agent": all_agents[i],
-                "response": step.response,
+                "response": step_dict["response"],
             })
 
     await _log(session, task.id, f"✓ Stage 2 complete — {len(reviews)} reviews collected")
@@ -433,14 +438,14 @@ async def execute_council(session: AsyncSession, task: Task, agents: list[Agent]
     )
 
     synth_step = await _run_step(
-        session, task, ceo_agent, synthesis_prompt, step_order=step_counter, step_label="synthesis"
+        task.id, ceo_agent, synthesis_prompt, step_order=step_counter, step_label="synthesis"
     )
 
     # =========================================================
     # STAGE 4 — Final Output
     # =========================================================
-    if synth_step.status == StepStatus.COMPLETED:
-        task.final_output = synth_step.response
+    if synth_step["status"] == StepStatus.COMPLETED:
+        task.final_output = synth_step["response"]
         task.status = TaskStatus.COMPLETED
         task.completed_at = datetime.now(timezone.utc)
         await _log(session, task.id, "✅ Council discussion complete — CEO has produced the final plan")

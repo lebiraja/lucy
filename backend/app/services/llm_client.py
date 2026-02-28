@@ -56,7 +56,15 @@ async def chat_completion(
 
     async with httpx.AsyncClient(timeout=settings.llm_request_timeout) as client:
         response = await client.post(url, json=payload)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            error_details = exc.response.text
+            try:
+                error_details = exc.response.json()
+            except Exception:
+                pass
+            raise Exception(f"Client error '{exc.response.status_code}' for url '{exc.request.url}'. Details: {error_details}")
 
     duration_ms = int((time.perf_counter() - start) * 1000)
     data = response.json()
