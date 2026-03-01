@@ -22,6 +22,7 @@ class AgentCreate(BaseModel):
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=2048, ge=1, le=128000)
     top_p: float = Field(default=0.95, ge=0.0, le=1.0)
+    context_window_tokens: int = Field(default=4096, ge=512, le=1000000)
     max_iterations: int = Field(default=10, ge=1, le=1000)
     timeout_seconds: int = Field(default=300, ge=10, le=86400)
 
@@ -40,6 +41,7 @@ class AgentUpdate(BaseModel):
     temperature: float | None = Field(default=None, ge=0.0, le=2.0)
     max_tokens: int | None = Field(default=None, ge=1, le=128000)
     top_p: float | None = Field(default=None, ge=0.0, le=1.0)
+    context_window_tokens: int | None = Field(default=None, ge=512, le=1000000)
     max_iterations: int | None = Field(default=None, ge=1, le=1000)
     timeout_seconds: int | None = Field(default=None, ge=10, le=86400)
 
@@ -60,6 +62,7 @@ class AgentResponse(BaseModel):
     temperature: float
     max_tokens: int
     top_p: float
+    context_window_tokens: int
     max_iterations: int
     timeout_seconds: int
     crash_count: int
@@ -95,6 +98,7 @@ class TaskResponse(BaseModel):
     strategy: TaskStrategy
     status: TaskStatus
     final_output: str | None
+    metadata: dict | None = None
     created_at: datetime
     completed_at: datetime | None
     steps: list["TaskStepResponse"] = []

@@ -7,6 +7,17 @@ from app.config import get_settings
 
 settings = get_settings()
 
+# Module-level shared client — initialized in app lifespan (main.py).
+# Using a single AsyncClient enables connection pooling across parallel agent calls.
+_http_client: httpx.AsyncClient | None = None
+
+
+def _get_client() -> httpx.AsyncClient:
+    """Return the shared httpx client. Falls back to a new client if not initialized (e.g. tests)."""
+    if _http_client is not None:
+        return _http_client
+    return httpx.AsyncClient(timeout=settings.llm_request_timeout)
+
 
 async def chat_completion(
     agent: Agent,
@@ -43,53 +54,47 @@ async def chat_completion(
         except Exception:
             model_name = "default"
 
-    # Safety: Enforce strict prompt truncation for models with tiny contexts
-    # Assume 1 token ~= 3.5 characters for basic truncation
-    safe_max_tokens = min(agent.max_tokens, 512) if agent.max_tokens else 512
-    # Default to 1024 total context if unknown, leaving safe_max_tokens for output
-    max_context_tokens = 1024 
-    max_input_tokens = max(max_context_tokens - safe_max_tokens - 100, 200) # leave 100 buffer
-    max_input_chars = int(max_input_tokens * 3.5)
+    # Context window: use agent.context_window_tokens if available, else default 4096
+    context_window = getattr(agent, 'context_window_tokens', None) or 4096
+    effective_max_output = min(agent.max_tokens, context_window // 2)
+    max_input_tokens = max(context_window - effective_max_output - 100, 200)  # 100 token buffer
+    max_input_chars = int(max_input_tokens * 3.5)  # ~3.5 chars per token
 
     processed_messages = []
     for msg in messages:
         content = msg.get("content", "")
         if isinstance(content, str) and len(content) > max_input_chars:
-            # Truncate content and append a note
             content = content[:max_input_chars] + "\n\n[...TRUNCATED DUE TO CONTEXT LIMIT...]"
-        
-        processed_messages.append({
-            "role": msg.get("role"),
-            "content": content
-        })
+        processed_messages.append({"role": msg.get("role"), "content": content})
 
     payload = {
         "model": model_name,
         "messages": processed_messages,
         "temperature": temperature if temperature is not None else agent.temperature,
-        "max_tokens": max_tokens if max_tokens is not None else safe_max_tokens,
+        "max_tokens": max_tokens if max_tokens is not None else effective_max_output,
         "top_p": top_p if top_p is not None else agent.top_p,
         "stream": False,
     }
 
     start = time.perf_counter()
+    client = _get_client()
 
-    async with httpx.AsyncClient(timeout=settings.llm_request_timeout) as client:
-        response = await client.post(url, json=payload)
+    response = await client.post(url, json=payload)
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        error_details = exc.response.text
         try:
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            error_details = exc.response.text
-            try:
-                error_details = exc.response.json()
-            except Exception:
-                pass
-            raise Exception(f"Client error '{exc.response.status_code}' for url '{exc.request.url}'. Details: {error_details}")
+            error_details = exc.response.json()
+        except Exception:
+            pass
+        raise Exception(
+            f"Client error '{exc.response.status_code}' for url '{exc.request.url}'. Details: {error_details}"
+        )
 
     duration_ms = int((time.perf_counter() - start) * 1000)
     data = response.json()
 
-    # Extract the assistant's reply
     content = data["choices"][0]["message"]["content"]
     return content, duration_ms
 
@@ -105,7 +110,8 @@ async def check_health(endpoint: str) -> tuple[bool, float | None, str | None]:
 
     try:
         start = time.perf_counter()
-        async with httpx.AsyncClient(timeout=settings.health_check_timeout) as client:
+        client = httpx.AsyncClient(timeout=settings.health_check_timeout)
+        async with client:
             response = await client.get(url)
             response.raise_for_status()
         latency_ms = round((time.perf_counter() - start) * 1000, 1)

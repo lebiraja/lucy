@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiGet, apiPost } from '../hooks/useApi';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useSSE } from '../hooks/useSSE';
 import LogViewer from './LogViewer';
 import OutputPanel from './OutputPanel';
 import './TaskCreator.css';
@@ -13,30 +14,24 @@ export default function TaskCreator() {
     const [useAll, setUseAll] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [activeTask, setActiveTask] = useState(null);
+    const [sseUrl, setSseUrl] = useState(null);
     const [error, setError] = useState(null);
 
     const { messages, isConnected, clearMessages } = useWebSocket('/api/ws/logs');
+    const { isDone: sseDone } = useSSE(sseUrl);
 
     useEffect(() => {
         apiGet('/agents').then(setAgents).catch(() => { });
     }, []);
 
-    // Poll active task for completion
+    // When SSE signals done, fetch final task state once
     useEffect(() => {
-        if (!activeTask || activeTask.status === 'completed' || activeTask.status === 'failed') return;
-
-        const interval = setInterval(async () => {
-            try {
-                const updated = await apiGet(`/tasks/${activeTask.id}`);
-                setActiveTask(updated);
-                if (updated.status === 'completed' || updated.status === 'failed') {
-                    clearInterval(interval);
-                }
-            } catch { /* ignore */ }
-        }, 2000);
-
-        return () => clearInterval(interval);
-    }, [activeTask?.id, activeTask?.status]);
+        if (!sseDone || !activeTask) return;
+        apiGet(`/tasks/${activeTask.id}`)
+            .then(updated => setActiveTask(updated))
+            .catch(() => { });
+        setSseUrl(null);
+    }, [sseDone, activeTask?.id]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -46,6 +41,7 @@ export default function TaskCreator() {
         setError(null);
         clearMessages();
         setActiveTask(null);
+        setSseUrl(null);
 
         try {
             const body = {
@@ -55,6 +51,8 @@ export default function TaskCreator() {
             };
             const task = await apiPost('/tasks', body);
             setActiveTask(task);
+            // Start SSE stream for this task
+            setSseUrl(`/api/tasks/${task.id}/events`);
         } catch (e) {
             setError(e.message);
         } finally {
@@ -155,14 +153,14 @@ export default function TaskCreator() {
                     {activeTask && (activeTask.status === 'completed' || activeTask.status === 'failed') && (
                         <OutputPanel task={activeTask} />
                     )}
-                    {activeTask && activeTask.status === 'running' && (
+                    {activeTask && activeTask.status !== 'completed' && activeTask.status !== 'failed' && !sseDone && (
                         <div className="running-indicator card">
                             <span className="spinner"></span>
                             <div className="running-details">
                                 <span>Task #{activeTask.id} is running...</span>
                                 {strategy === 'council' && messages.length > 0 && (
                                     <span className="current-stage">
-                                        {messages.findLast(m => m.message?.includes('STAGE'))?.message?.split(':')[0] || 'Starting...'}
+                                        {messages.slice().reverse().find(m => m.message?.includes('STAGE'))?.message?.split('\n')[0] || 'Starting...'}
                                     </span>
                                 )}
                             </div>

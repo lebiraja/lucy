@@ -10,6 +10,42 @@ const STAGE_META = {
     synthesis: { label: '🧠 Synthesis', title: 'Stage 3 — CEO Synthesis', desc: 'The CEO synthesized all inputs into the final plan.' },
 };
 
+const RANK_MEDALS = ['🥇', '🥈', '🥉'];
+
+function RankingLeaderboard({ rankings }) {
+    if (!rankings || rankings.length === 0) return null;
+    return (
+        <div className="ranking-leaderboard">
+            <h4>📊 Peer Review Rankings</h4>
+            <p className="ranking-desc">Aggregate ranking from anonymous peer review (lower avg = better)</p>
+            <table className="ranking-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Agent</th>
+                        <th>Role</th>
+                        <th>Avg Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {rankings.map((r, i) => (
+                        <tr key={r.agent_id} className={i === 0 ? 'rank-first' : ''}>
+                            <td className="rank-medal">{RANK_MEDALS[i] || `#${i + 1}`}</td>
+                            <td className="rank-name">{r.agent_name}</td>
+                            <td>
+                                <span className={`badge ${ROLE_COLORS[r.agent_role] || 'badge-default'} badge-sm`}>
+                                    {ROLE_LABELS[r.agent_role] || r.agent_role}
+                                </span>
+                            </td>
+                            <td className="rank-score">{typeof r.avg_rank === 'number' ? r.avg_rank.toFixed(2) : '—'}</td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+    );
+}
+
 export default function OutputPanel({ task }) {
     const [activeStage, setActiveStage] = useState('opinion');
     const [expandedSteps, setExpandedSteps] = useState(new Set());
@@ -19,6 +55,7 @@ export default function OutputPanel({ task }) {
     const statusClass = task.status === 'completed' ? 'success' : task.status === 'failed' ? 'danger' : 'running';
     const isCouncil = task.strategy === 'council';
     const steps = task.steps || [];
+    const rankings = task.metadata?.aggregate_rankings || [];
 
     // Group steps by label for council view
     const stageGroups = {
@@ -67,6 +104,14 @@ export default function OutputPanel({ task }) {
                     >
                         ✅ Final Plan
                     </button>
+                    {rankings.length > 0 && (
+                        <button
+                            className={`stage-tab rankings-tab ${activeStage === 'rankings' ? 'active' : ''}`}
+                            onClick={() => setActiveStage('rankings')}
+                        >
+                            📊 Rankings
+                        </button>
+                    )}
                 </div>
 
                 {/* Stage content */}
@@ -77,6 +122,8 @@ export default function OutputPanel({ task }) {
                             {task.final_output || 'Waiting for CEO synthesis...'}
                         </div>
                     </div>
+                ) : activeStage === 'rankings' ? (
+                    <RankingLeaderboard rankings={rankings} />
                 ) : (
                     <div className="stage-content">
                         <div className="stage-info">

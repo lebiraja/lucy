@@ -1,6 +1,7 @@
 """Lucy — Multi-Agent Orchestration Platform Backend."""
 
 from contextlib import asynccontextmanager
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -14,10 +15,19 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create database tables on startup."""
+    """Startup: create DB tables + shared httpx client. Shutdown: clean up."""
+    # Shared HTTP client for all vLLM calls — enables connection pooling
+    import app.services.llm_client as llm_client
+    llm_client._http_client = httpx.AsyncClient(
+        timeout=settings.llm_request_timeout,
+        limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+    )
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
+
+    await llm_client._http_client.aclose()
     await engine.dispose()
 
 
@@ -28,10 +38,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# CORS — use explicit origins from settings (wildcard + credentials is invalid per browser spec)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

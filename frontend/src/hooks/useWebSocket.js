@@ -26,9 +26,16 @@ export function useWebSocket(path) {
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    setMessages(prev => [...prev, data]);
+                    setMessages(prev => {
+                        const next = [...prev, data];
+                        // Cap at 500 to prevent unbounded memory growth
+                        return next.length > 500 ? next.slice(-500) : next;
+                    });
                 } catch {
-                    setMessages(prev => [...prev, { message: event.data }]);
+                    setMessages(prev => {
+                        const next = [...prev, { message: event.data }];
+                        return next.length > 500 ? next.slice(-500) : next;
+                    });
                 }
             };
 

@@ -118,6 +118,7 @@ class Agent(Base):
     temperature = Column(Float, default=0.7, nullable=False)
     max_tokens = Column(Integer, default=2048, nullable=False)
     top_p = Column(Float, default=0.95, nullable=False)
+    context_window_tokens = Column(Integer, default=4096, nullable=False)
 
     # Execution limits
     max_iterations = Column(Integer, default=10, nullable=False)
@@ -156,6 +157,7 @@ class Task(Base):
     strategy = Column(Enum(TaskStrategy), nullable=False)
     status = Column(Enum(TaskStatus), default=TaskStatus.PENDING, nullable=False)
     final_output = Column(Text, nullable=True)
+    metadata = Column(JSON, nullable=True)  # council rankings, label map, stage data
 
     created_at = Column(
         DateTime(timezone=True),

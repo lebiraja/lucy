@@ -309,3 +309,65 @@ details[open] .step-summary::before {
     max-height: 300px;
     overflow-y: auto;
 }
+/* ── Ranking Leaderboard ─────────────────────────────── */
+.ranking-leaderboard {
+    padding: var(--space-lg);
+}
+
+.ranking-leaderboard h4 {
+    margin: 0 0 var(--space-xs);
+    font-size: 1rem;
+}
+
+.ranking-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: var(--space-md);
+}
+
+.ranking-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.ranking-table th {
+    text-align: left;
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.ranking-table td {
+    padding: var(--space-sm);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.ranking-table tr.rank-first td {
+    background: rgba(255, 215, 0, 0.07);
+    font-weight: 600;
+}
+
+.rank-medal {
+    font-size: 1.25rem;
+    text-align: center;
+    width: 2rem;
+}
+
+.rank-name {
+    font-weight: 500;
+}
+
+.rank-score {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.rankings-tab {
+    border-color: var(--color-success, #22c55e) !important;
+}
