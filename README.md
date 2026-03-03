@@ -1,6 +1,10 @@
 # Lucy — Multi-Agent Orchestration Platform
 
+
+
 A powerful platform to connect, manage, and orchestrate multiple LLM models running via vLLM across lab systems, with a central orchestrator agent (Lucy) coordinating everything.
+
+
 
 ## Quick Start
 
@@ -60,3 +64,9 @@ cd frontend && npm install && npm run dev
 docker compose down       # Stop containers
 docker compose down -v    # Stop + remove database volume
 ```
+
+
+
+
+
+DSCS
