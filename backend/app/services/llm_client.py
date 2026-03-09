@@ -161,13 +161,19 @@ async def fetch_model_info(endpoint: str) -> dict:
         except (TypeError, ValueError):
             pass
 
+    # Fallback safe values that work for any 3B–12B (quantized) model
+    FALLBACK_CONTEXT = 4096
+    FALLBACK_MAX_TOKENS = 512  # ~12% of FALLBACK_CONTEXT — safe for any 3B-12B model
+
     result: dict = {
         "model_name": model_id,
         "models": [m.get("id") for m in models],
+        # Always include these so the caller never has to guess
+        "max_model_len": max_model_len if max_model_len is not None else FALLBACK_CONTEXT,
+        "recommended_max_tokens": (
+            min(max_model_len // 8, 2048) if max_model_len is not None else FALLBACK_MAX_TOKENS
+        ),
+        "context_auto_detected": max_model_len is not None,
     }
-    if max_model_len is not None:
-        result["max_model_len"] = max_model_len
-        # Recommend max_tokens as 25% of context window, capped at 4096
-        result["recommended_max_tokens"] = min(max_model_len // 4, 4096)
     return result
 

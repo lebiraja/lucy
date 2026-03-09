@@ -66,6 +66,7 @@ export default function Agents() {
     models?: string[];
     max_model_len?: number;
     recommended_max_tokens?: number;
+    context_auto_detected?: boolean;
     error?: string;
   } | null>(null);
 
@@ -89,15 +90,13 @@ export default function Agents() {
     try {
       const result = await api.probeEndpoint(form.endpoint.trim());
       if (result.success && result.model_name) {
-        setForm(prev => {
-          const updates: Partial<FormState> = { model_name: result.model_name! };
-          if (result.max_model_len) {
-            updates.context_window_tokens = result.max_model_len;
-            // Sensible default: 25% of context window, capped at 4096
-            updates.max_tokens = result.recommended_max_tokens ?? Math.min(result.max_model_len / 4, 4096);
-          }
-          return { ...prev, ...updates };
-        });
+        setForm(prev => ({
+          ...prev,
+          model_name: result.model_name!,
+          // Always apply — backend guarantees these with safe fallbacks
+          context_window_tokens: result.max_model_len ?? 4096,
+          max_tokens: result.recommended_max_tokens ?? 512,
+        }));
       }
       setProbeResult(result);
     } catch (e: any) {
@@ -376,7 +375,10 @@ export default function Agents() {
                         <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                         Detected: <strong>{probeResult.model_name}</strong>
                         {probeResult.max_model_len && (
-                          <span className="ml-1 opacity-70">· {probeResult.max_model_len.toLocaleString()} ctx tokens</span>
+                          <span className="ml-1 opacity-70">
+                            · {probeResult.max_model_len.toLocaleString()} ctx
+                            {!probeResult.context_auto_detected && " (default)"}
+                          </span>
                         )}
                         {probeResult.models && probeResult.models.length > 1 && (
                           <span className="ml-1 opacity-70">({probeResult.models.length} models available)</span>
