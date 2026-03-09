@@ -31,6 +31,8 @@ export interface AgentConfig {
   max_tokens: number;
   top_p: number;
   context_window_tokens: number;
+  max_iterations: number;
+  timeout_seconds: number;
   state: AgentState;
   operational_status: string;
   infrastructure_status: string;

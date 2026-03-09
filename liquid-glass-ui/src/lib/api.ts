@@ -56,6 +56,15 @@ export const api = {
         if (!res.ok) throw new Error("Failed to check agent health");
         return res.json();
     },
+    probeEndpoint: async (endpoint: string): Promise<{ success: boolean; model_name?: string; models?: string[]; error?: string }> => {
+        const res = await fetch(`${API_BASE}/agents/probe`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ endpoint }),
+        });
+        if (!res.ok) throw new Error("Probe request failed");
+        return res.json();
+    },
 
     // Tasks
     getTasks: async (): Promise<Task[]> => {
