@@ -1,4 +1,4 @@
-# Lucy --- Hierarchical Multi-Agent Orchestration Platform
+# Lucy --- Hierarchical Multi-Agent communication Platform
 
 ## Extended Features Specification
 
