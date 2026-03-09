@@ -149,9 +149,25 @@ async def fetch_model_info(endpoint: str) -> dict:
         raise ValueError("No models found at this endpoint")
 
     # vLLM typically serves one model per endpoint
-    model_id = models[0].get("id", "unknown")
-    return {
+    first = models[0]
+    model_id = first.get("id", "unknown")
+
+    # vLLM exposes max_model_len in the model object
+    max_model_len: int | None = None
+    raw = first.get("max_model_len") or first.get("max_context_length")
+    if raw is not None:
+        try:
+            max_model_len = int(raw)
+        except (TypeError, ValueError):
+            pass
+
+    result: dict = {
         "model_name": model_id,
         "models": [m.get("id") for m in models],
     }
+    if max_model_len is not None:
+        result["max_model_len"] = max_model_len
+        # Recommend max_tokens as 25% of context window, capped at 4096
+        result["recommended_max_tokens"] = min(max_model_len // 4, 4096)
+    return result
 

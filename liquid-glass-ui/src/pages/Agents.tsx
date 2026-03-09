@@ -61,7 +61,12 @@ export default function Agents() {
   // Probe state
   const [probing, setProbing] = useState(false);
   const [probeResult, setProbeResult] = useState<{
-    success: boolean; model_name?: string; models?: string[]; error?: string;
+    success: boolean;
+    model_name?: string;
+    models?: string[];
+    max_model_len?: number;
+    recommended_max_tokens?: number;
+    error?: string;
   } | null>(null);
 
   // Detail sheet
@@ -84,7 +89,15 @@ export default function Agents() {
     try {
       const result = await api.probeEndpoint(form.endpoint.trim());
       if (result.success && result.model_name) {
-        setForm(prev => ({ ...prev, model_name: result.model_name! }));
+        setForm(prev => {
+          const updates: Partial<FormState> = { model_name: result.model_name! };
+          if (result.max_model_len) {
+            updates.context_window_tokens = result.max_model_len;
+            // Sensible default: 25% of context window, capped at 4096
+            updates.max_tokens = result.recommended_max_tokens ?? Math.min(result.max_model_len / 4, 4096);
+          }
+          return { ...prev, ...updates };
+        });
       }
       setProbeResult(result);
     } catch (e: any) {
@@ -362,6 +375,9 @@ export default function Agents() {
                     ? <>
                         <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                         Detected: <strong>{probeResult.model_name}</strong>
+                        {probeResult.max_model_len && (
+                          <span className="ml-1 opacity-70">· {probeResult.max_model_len.toLocaleString()} ctx tokens</span>
+                        )}
                         {probeResult.models && probeResult.models.length > 1 && (
                           <span className="ml-1 opacity-70">({probeResult.models.length} models available)</span>
                         )}
