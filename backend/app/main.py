@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -29,6 +30,12 @@ async def lifespan(app: FastAPI):
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Reset tasks left in-flight from a previous crashed/reloaded server run
+        await conn.execute(text(
+            "UPDATE tasks SET status = 'failed', "
+            "final_output = 'Server restarted while task was in progress' "
+            "WHERE status IN ('pending', 'running')"
+        ))
     yield
 
     await llm_client._http_client.aclose()

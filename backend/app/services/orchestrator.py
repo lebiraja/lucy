@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import async_session
 from app.models import (
     Agent, AgentState, Task, TaskStep, LogEntry,
-    TaskStrategy, TaskStatus, StepStatus, LogLevel,
+    TaskStrategy, TaskStatus, StepStatus, LogLevel, OperationalStatus,
 )
 from app.services.llm_client import chat_completion
 from app.services.logger import log_broadcaster
@@ -250,11 +250,17 @@ async def execute_parallel(session: AsyncSession, task: Task, agents: list[Agent
 
     await _log(task.id, f"Collected {len(responses)} responses, aggregating...")
 
-    # Find orchestrator agent for synthesis
-    result = await session.execute(
-        select(Agent).where(Agent.is_orchestrator == True, Agent.is_active == True)
-    )
-    orchestrator_agent = result.scalar_one_or_none()
+    # Find orchestrator agent for synthesis (fresh session avoids stale connection on long tasks)
+    orchestrator_agent = None
+    async with async_session() as orch_session:
+        orch_result = await orch_session.execute(
+            select(Agent).where(
+                Agent.is_orchestrator == True,
+                Agent.is_active == True,
+                Agent.operational_status == OperationalStatus.ACTIVE,
+            )
+        )
+        orchestrator_agent = orch_result.scalar_one_or_none()
 
     if orchestrator_agent:
         synthesis_prompt = (
@@ -292,11 +298,16 @@ async def execute_dynamic(session: AsyncSession, task: Task, agents: list[Agent]
     """
     await _log(task.id, "Starting DYNAMIC execution — consulting orchestrator...")
 
-    # Find orchestrator
-    result = await session.execute(
-        select(Agent).where(Agent.is_orchestrator == True, Agent.is_active == True)
-    )
-    orchestrator_agent = result.scalar_one_or_none()
+    # Find orchestrator (fresh session avoids stale connection on long tasks)
+    async with async_session() as orch_session:
+        orch_result = await orch_session.execute(
+            select(Agent).where(
+                Agent.is_orchestrator == True,
+                Agent.is_active == True,
+                Agent.operational_status == OperationalStatus.ACTIVE,
+            )
+        )
+        orchestrator_agent = orch_result.scalar_one_or_none()
 
     if not orchestrator_agent:
         await _log(task.id, "No orchestrator agent configured — falling back to parallel", level="warning")

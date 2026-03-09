@@ -51,8 +51,10 @@ async def chat_completion(
         try:
             info = await fetch_model_info(agent.endpoint)
             model_name = info["model_name"]
-        except Exception:
-            model_name = "default"
+        except Exception as e:
+            raise Exception(
+                f"Agent '{agent.name}' has no model_name set and endpoint probe failed: {e}"
+            )
 
     # Context window: use agent.context_window_tokens if available, else default 4096
     context_window = getattr(agent, 'context_window_tokens', None) or 4096

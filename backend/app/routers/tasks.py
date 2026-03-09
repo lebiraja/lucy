@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db, async_session
-from app.models import Agent, Task, TaskStatus, LogEntry, TaskStep
+from app.models import Agent, Task, TaskStatus, LogEntry, TaskStep, OperationalStatus
 from app.schemas import TaskCreate, TaskResponse, LogEntryResponse
 from app.services.orchestrator import execute_task
 from app.services.logger import log_broadcaster
@@ -40,11 +40,18 @@ async def _run_task_background(task_id: int, agent_ids: list[int] | None):
 
             if agent_ids:
                 result = await session.execute(
-                    select(Agent).where(Agent.id.in_(agent_ids), Agent.is_active == True)
+                    select(Agent).where(
+                        Agent.id.in_(agent_ids),
+                        Agent.is_active == True,
+                        Agent.operational_status == OperationalStatus.ACTIVE,
+                    )
                 )
             else:
                 result = await session.execute(
-                    select(Agent).where(Agent.is_active == True)
+                    select(Agent).where(
+                        Agent.is_active == True,
+                        Agent.operational_status == OperationalStatus.ACTIVE,
+                    )
                 )
             agents = list(result.scalars().all())
 
