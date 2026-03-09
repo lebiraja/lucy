@@ -55,7 +55,6 @@ export default function Tasks() {
 
   const handleExecute = () => {
     if (!prompt.trim()) return;
-    setResult(null);
 
     const agentIds = selectedAgents.length > 0 ? selectedAgents : undefined;
     createMutation.mutate({ prompt, strategy, agent_ids: agentIds });

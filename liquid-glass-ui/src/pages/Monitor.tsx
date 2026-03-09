@@ -48,15 +48,13 @@ export default function Monitor() {
     ws.onclose = () => setWsConnected(false);
     ws.onerror = () => setWsConnected(false);
 
+    let wsCounter = 0;
     ws.onmessage = (event) => {
       if (pausedRef.current) return;
       try {
-        const entry = JSON.parse(event.data) as LogEntry;
-        setLogs(prev => {
-          // Deduplicate by id
-          if (prev.some(l => l.id === entry.id)) return prev;
-          return [...prev, entry];
-        });
+        const raw = JSON.parse(event.data);
+        const entry: LogEntry = { id: `ws-${Date.now()}-${wsCounter++}`, ...raw };
+        setLogs(prev => [...prev, entry]);
       } catch {}
     };
 
