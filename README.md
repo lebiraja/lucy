@@ -1,31 +1,33 @@
 # Lucy — Multi-Agent Orchestration Platform
 
-
-
-A powerful platform to connect, manage, and orchestrate multiple LLM models running via vLLM across lab systems, with a central orchestrator agent (Lucy) coordinating everything.
-
-
+A powerful platform to connect, manage, and orchestrate multiple LLM models running via vLLM across lab systems, with a central orchestrator agent coordinating everything.
 
 ## Quick Start
 
 ```bash
 # Start everything
-docker compose up --build
+docker compose up -d
 
-# Access the admin panel
-open http://localhost:3000
+# Access the UI
+open http://localhost:2000
 
-# API docs
-open http://localhost:8000/docs
+# API docs (Swagger)
+open http://localhost:2800/docs
 ```
 
-## Architecture
+## Service Ports
 
 | Service | Port | Description |
 |---------|------|-------------|
-| **Frontend** | `3000` | React admin panel (Nginx) |
-| **Backend** | `8000` | FastAPI orchestrator API |
-| **Database** | `5432` | PostgreSQL 16 |
+| **Frontend** | `2000` | React + Liquid Glass UI (nginx) |
+| **Backend** | `2800` | FastAPI orchestrator API |
+| **Database** | `2543` | PostgreSQL 16 |
+
+## Documentation
+
+- [Architecture & System Design](docs/ARCHITECTURE.md)
+- [API Reference](docs/API.md)
+- [Fixes & Implementation Notes](docs/FIXES.md)
 
 ## Orchestration Strategies
 
