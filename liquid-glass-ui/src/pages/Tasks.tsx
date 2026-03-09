@@ -3,7 +3,7 @@ import GlassCard from "@/components/GlassCard";
 import { api } from "@/lib/api";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Strategy, Task } from "@/types/lucy";
-import { Play, Zap, GitBranch, Users, Layers, Loader2, CheckCircle } from "lucide-react";
+import { Play, Zap, GitBranch, Users, Layers, Loader2, CheckCircle, XCircle, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
@@ -21,9 +21,21 @@ export default function Tasks() {
   const { data: agents = [] } = useQuery({ queryKey: ["agents"], queryFn: api.getAgents });
   const [prompt, setPrompt] = useState("");
   const [strategy, setStrategy] = useState<Strategy>("sequential");
-  const [selectedAgents, setSelectedAgents] = useState<number[]>([]); 
-  const [result, setResult] = useState<Task | null>(null);
+  const [selectedAgents, setSelectedAgents] = useState<number[]>([]);
+  const [trackingId, setTrackingId] = useState<number | null>(null);
   const { toast } = useToast();
+
+  // Poll GET /api/tasks/:id until the task reaches a terminal state
+  const { data: liveTask } = useQuery<Task>({
+    queryKey: ["task", trackingId],
+    queryFn: () => api.getTask(trackingId!),
+    enabled: trackingId !== null,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === "completed" || status === "failed") return false;
+      return 2000;
+    },
+  });
 
   const toggleAgent = (id: number) => {
     setSelectedAgents(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]);
@@ -34,8 +46,8 @@ export default function Tasks() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["health"] });
-      setResult(data);
-      toast({ title: "Task started", description: "Task is now running" });
+      setTrackingId(data.id);
+      toast({ title: "Task queued", description: "Waiting for agents…" });
       setPrompt("");
     },
     onError: (err) => toast({ title: "Error", description: err.message, variant: "destructive" }),
@@ -126,42 +138,83 @@ export default function Tasks() {
 
       {/* Results */}
       <AnimatePresence>
-        {result && (
+        {trackingId !== null && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+            {/* Status header */}
             <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-accent" />
+              {!liveTask || liveTask.status === "pending" || liveTask.status === "running" ? (
+                <Loader2 className="w-4 h-4 animate-spin text-secondary" />
+              ) : liveTask.status === "completed" ? (
+                <CheckCircle className="w-4 h-4 text-accent" />
+              ) : (
+                <XCircle className="w-4 h-4 text-destructive" />
+              )}
               <h2 className="text-sm font-medium text-foreground">Task Result</h2>
-              <Badge className="bg-accent/20 text-accent border-0 text-[10px]">{result.status}</Badge>
-              <span className="text-xs text-muted-foreground ml-auto">
-                {result.completed_at ? `${((new Date(result.completed_at).getTime() - new Date(result.created_at).getTime()) / 1000).toFixed(1)}s total` : "running..."}
+              {liveTask && (
+                <Badge className={`border-0 text-[10px] ${
+                  liveTask.status === "completed" ? "bg-accent/20 text-accent" :
+                  liveTask.status === "failed" ? "bg-destructive/20 text-destructive" :
+                  liveTask.status === "running" ? "bg-secondary/20 text-secondary" :
+                  "bg-muted text-muted-foreground"
+                }`}>{liveTask.status}</Badge>
+              )}
+              <span className="text-xs text-muted-foreground ml-auto flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {liveTask?.completed_at
+                  ? `${((new Date(liveTask.completed_at).getTime() - new Date(liveTask.created_at).getTime()) / 1000).toFixed(1)}s total`
+                  : liveTask?.status === "running" ? "running…" : "queued…"}
               </span>
             </div>
-            <Accordion type="multiple" className="space-y-2">
-              {result.steps.map((step, i) => (
-                <AccordionItem key={i} value={`step-${i}`} className="glass-panel border-border/30">
-                  <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                    <div className="flex items-center gap-3 text-left">
-                      <span className="text-xs text-muted-foreground font-mono">#{i + 1}</span>
-                      <span className="text-sm font-medium text-foreground">{step.agent_name ?? "Unknown"}</span>
-                      <Badge className="text-[9px] bg-muted text-muted-foreground border-0">{step.agent_role ?? step.step_label ?? ""}</Badge>
-                      <span className="text-xs text-muted-foreground ml-auto mr-2">{step.duration_ms ? `${(step.duration_ms / 1000).toFixed(1)}s` : "—"}</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-4 pb-4">
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Input</p>
-                        <p className="text-xs text-muted-foreground">{step.input_prompt}</p>
+
+            {/* Running placeholder */}
+            {(!liveTask || liveTask.status === "pending" || liveTask.status === "running") && (
+              <GlassCard className="flex items-center gap-3 py-6 justify-center">
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">
+                  {liveTask?.status === "running"
+                    ? `Running… ${liveTask.steps.length} step${liveTask.steps.length !== 1 ? "s" : ""} so far`
+                    : "Queuing task…"}
+                </span>
+              </GlassCard>
+            )}
+
+            {/* Final output */}
+            {liveTask?.final_output && (
+              <GlassCard className="p-4">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-2">Final Output</p>
+                <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{liveTask.final_output}</p>
+              </GlassCard>
+            )}
+
+            {/* Steps */}
+            {liveTask && liveTask.steps.length > 0 && (
+              <Accordion type="multiple" className="space-y-2">
+                {liveTask.steps.map((step, i) => (
+                  <AccordionItem key={i} value={`step-${i}`} className="glass-panel border-border/30">
+                    <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                      <div className="flex items-center gap-3 text-left">
+                        <span className="text-xs text-muted-foreground font-mono">#{i + 1}</span>
+                        <span className="text-sm font-medium text-foreground">{step.agent_name ?? "Unknown"}</span>
+                        <Badge className="text-[9px] bg-muted text-muted-foreground border-0">{step.agent_role ?? step.step_label ?? ""}</Badge>
+                        <span className="text-xs text-muted-foreground ml-auto mr-2">{step.duration_ms ? `${(step.duration_ms / 1000).toFixed(1)}s` : "—"}</span>
                       </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Response</p>
-                        <p className="text-sm text-foreground leading-relaxed">{step.response}</p>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Input</p>
+                          <p className="text-xs text-muted-foreground">{step.input_prompt}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Response</p>
+                          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{step.response}</p>
+                        </div>
                       </div>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

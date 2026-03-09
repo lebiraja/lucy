@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import GlassCard from "@/components/GlassCard";
 import { api } from "@/lib/api";
-import { useQuery } from "@tanstack/react-query";
 import type { LogEntry, LogLevel } from "@/types/lucy";
-import { Terminal, Pause, Play, Trash2 } from "lucide-react";
+import { Terminal, Pause, Play, Trash2, Wifi, WifiOff } from "lucide-react";
 import { motion } from "framer-motion";
 
 const levelClass: Record<LogLevel, string> = {
@@ -26,13 +25,46 @@ export default function Monitor() {
   const [paused, setPaused] = useState(false);
   const [filter, setFilter] = useState<LogLevel | "all">("all");
   const [clearedAt, setClearedAt] = useState(0);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [wsConnected, setWsConnected] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
 
-  const { data: logs = [] } = useQuery({
-    queryKey: ["logs"],
-    queryFn: () => api.getLogs(200),
-    refetchInterval: paused ? false : 2000,
-  });
+  // Load historical logs on mount
+  useEffect(() => {
+    api.getLogs(200).then(data => setLogs(data as LogEntry[])).catch(() => {});
+  }, []);
+
+  // WebSocket for real-time streaming
+  useEffect(() => {
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    const host = window.location.host;
+    const ws = new WebSocket(`${proto}://${host}/api/ws/logs`);
+    wsRef.current = ws;
+
+    ws.onopen = () => setWsConnected(true);
+    ws.onclose = () => setWsConnected(false);
+    ws.onerror = () => setWsConnected(false);
+
+    ws.onmessage = (event) => {
+      if (pausedRef.current) return;
+      try {
+        const entry = JSON.parse(event.data) as LogEntry;
+        setLogs(prev => {
+          // Deduplicate by id
+          if (prev.some(l => l.id === entry.id)) return prev;
+          return [...prev, entry];
+        });
+      } catch {}
+    };
+
+    return () => {
+      ws.close();
+      wsRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current && !paused) {
@@ -85,13 +117,18 @@ export default function Monitor() {
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/30">
           <Terminal className="w-4 h-4 text-primary" />
           <span className="text-xs text-muted-foreground font-mono">lucy://logs</span>
-          {!paused && (
-            <motion.div
-              animate={{ opacity: [0.3, 1, 0.3] }}
-              transition={{ repeat: Infinity, duration: 1.5 }}
-              className="w-2 h-2 rounded-full bg-accent ml-auto"
-            />
-          )}
+          <div className="ml-auto flex items-center gap-1.5">
+            {wsConnected
+              ? <><Wifi className="w-3 h-3 text-accent" /><span className="text-xs text-accent">live</span></>
+              : <><WifiOff className="w-3 h-3 text-muted-foreground" /><span className="text-xs text-muted-foreground">offline</span></>}
+            {!paused && wsConnected && (
+              <motion.div
+                animate={{ opacity: [0.3, 1, 0.3] }}
+                transition={{ repeat: Infinity, duration: 1.5 }}
+                className="w-2 h-2 rounded-full bg-accent ml-1"
+              />
+            )}
+          </div>
         </div>
         <div ref={scrollRef} className="flex-1 overflow-auto p-4 font-mono text-xs space-y-0.5 max-h-[60vh]">
           {filtered.map((log) => (

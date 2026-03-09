@@ -74,7 +74,7 @@ export default function History() {
       {/* Task list */}
       <Accordion type="multiple" className="space-y-3">
         {filtered.map((task, i) => (
-          <AccordionItem key={task.id} value={task.id} className="border-0">
+          <AccordionItem key={task.id} value={String(task.id)} className="border-0">
             <GlassCard className="p-0" transition={{ delay: i * 0.05 }}>
               <AccordionTrigger className="px-5 py-4 hover:no-underline w-full">
                 <div className="flex items-start gap-3 text-left w-full">
