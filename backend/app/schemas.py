@@ -98,7 +98,7 @@ class TaskResponse(BaseModel):
     strategy: TaskStrategy
     status: TaskStatus
     final_output: str | None
-    metadata: dict | None = None
+    task_metadata: dict | None = None
     created_at: datetime
     completed_at: datetime | None
     steps: list["TaskStepResponse"] = []

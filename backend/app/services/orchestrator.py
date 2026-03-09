@@ -547,7 +547,7 @@ async def execute_council(session: AsyncSession, task: Task, agents: list[Agent]
         task.status = TaskStatus.COMPLETED
         task.completed_at = datetime.now(timezone.utc)
         # Store council metadata for frontend display
-        task.metadata = {
+        task.task_metadata = {
             "label_to_agent": {label: a.id for label, a in label_to_agent.items()},
             "aggregate_rankings": aggregate_rankings,
             "opinions": [

@@ -15,7 +15,15 @@ class Settings(BaseSettings):
     frontend_port: int = 3000
 
     # CORS — allow frontend origin (override with CORS_ORIGINS env var, comma-separated)
-    cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173"]
+    cors_origins: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://localhost:2000",
+        "http://127.0.0.1:2000",
+        "http://localhost:2800",
+        "http://127.0.0.1:2800",
+    ]
 
     # vLLM defaults
     default_temperature: float = 0.7

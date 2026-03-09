@@ -157,7 +157,7 @@ class Task(Base):
     strategy = Column(Enum(TaskStrategy), nullable=False)
     status = Column(Enum(TaskStatus), default=TaskStatus.PENDING, nullable=False)
     final_output = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)  # council rankings, label map, stage data
+    task_metadata = Column(JSON, nullable=True)  # council rankings, label map, stage data
 
     created_at = Column(
         DateTime(timezone=True),

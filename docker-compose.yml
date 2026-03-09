@@ -12,7 +12,7 @@ services:
     volumes:
       - lucy_pgdata:/var/lib/postgresql/data
     ports:
-      - "5433:5432"
+      - "2543:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -42,7 +42,7 @@ services:
   # ===== React Frontend (Nginx) =====
   frontend:
     build:
-      context: ./frontend
+      context: ./liquid-glass-ui
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
