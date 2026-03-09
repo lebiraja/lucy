@@ -1,0 +1,247 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 230 25% 7%;
+    --foreground: 210 40% 96%;
+
+    --card: 230 20% 12%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 230 20% 10%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 260 60% 65%;
+    --primary-foreground: 230 25% 7%;
+
+    --secondary: 200 60% 50%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 230 15% 18%;
+    --muted-foreground: 220 15% 55%;
+
+    --accent: 170 60% 45%;
+    --accent-foreground: 230 25% 7%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 230 15% 20%;
+    --input: 230 15% 20%;
+    --ring: 260 60% 65%;
+
+    --radius: 0.75rem;
+
+    --glass-bg: 230 20% 14% / 0.4;
+    --glass-border: 210 30% 80% / 0.08;
+    --glass-glow: 260 60% 65% / 0.15;
+    --glass-glow-secondary: 200 60% 50% / 0.12;
+    --glass-glow-accent: 170 60% 45% / 0.12;
+
+    --status-online: 145 70% 50%;
+    --status-offline: 0 70% 55%;
+    --status-paused: 40 80% 55%;
+    --status-idle: 220 15% 55%;
+
+    --sidebar-background: 230 20% 9%;
+    --sidebar-foreground: 220 15% 70%;
+    --sidebar-primary: 260 60% 65%;
+    --sidebar-primary-foreground: 210 40% 96%;
+    --sidebar-accent: 230 15% 15%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 230 15% 16%;
+    --sidebar-ring: 260 60% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Space Grotesk', sans-serif;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply relative rounded-xl border;
+    background: hsla(var(--glass-bg));
+    border-color: hsla(var(--glass-border));
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  }
+
+  .glass-panel-glow {
+    @apply glass-panel;
+    box-shadow:
+      0 0 30px -10px hsla(var(--glass-glow)),
+      0 0 60px -20px hsla(var(--glass-glow-secondary)),
+      inset 0 1px 0 0 hsla(var(--glass-border));
+  }
+
+  .glass-button {
+    @apply relative rounded-lg px-4 py-2 font-medium text-sm transition-all duration-300;
+    background: hsla(var(--glass-bg));
+    border: 1px solid hsla(var(--glass-border));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  .glass-button:hover {
+    background: hsla(230 20% 18% / 0.6);
+    border-color: hsla(var(--ring) / 0.3);
+    box-shadow: 0 0 20px -5px hsla(var(--glass-glow));
+  }
+
+  .glass-input {
+    @apply w-full rounded-lg px-4 py-3 text-sm transition-all duration-300;
+    background: hsla(230 20% 10% / 0.5);
+    border: 1px solid hsla(var(--glass-border));
+    backdrop-filter: blur(12px);
+    color: hsl(var(--foreground));
+  }
+
+  .glass-input:focus {
+    outline: none;
+    border-color: hsla(var(--ring) / 0.4);
+    box-shadow: 0 0 20px -5px hsla(var(--glass-glow));
+  }
+
+  .glass-input::placeholder {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .status-dot {
+    @apply w-2.5 h-2.5 rounded-full;
+  }
+
+  .status-dot-online {
+    @apply status-dot;
+    background: hsl(var(--status-online));
+    box-shadow: 0 0 8px 2px hsla(var(--status-online) / 0.5);
+  }
+
+  .status-dot-offline {
+    @apply status-dot;
+    background: hsl(var(--status-offline));
+    box-shadow: 0 0 8px 2px hsla(var(--status-offline) / 0.5);
+  }
+
+  .status-dot-paused {
+    @apply status-dot;
+    background: hsl(var(--status-paused));
+    box-shadow: 0 0 8px 2px hsla(var(--status-paused) / 0.5);
+  }
+
+  .status-dot-idle {
+    @apply status-dot;
+    background: hsl(var(--muted-foreground));
+  }
+
+  .aurora-bg {
+    @apply fixed inset-0 -z-10 overflow-hidden;
+  }
+
+  .aurora-blob {
+    @apply absolute rounded-full blur-3xl opacity-30;
+    animation: aurora-float 20s ease-in-out infinite;
+  }
+
+  .aurora-blob-1 {
+    @apply aurora-blob;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, hsla(260 60% 55% / 0.4), transparent 70%);
+    top: -10%;
+    left: -10%;
+    animation-delay: 0s;
+  }
+
+  .aurora-blob-2 {
+    @apply aurora-blob;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, hsla(200 60% 50% / 0.3), transparent 70%);
+    top: 40%;
+    right: -10%;
+    animation-delay: -7s;
+  }
+
+  .aurora-blob-3 {
+    @apply aurora-blob;
+    width: 450px;
+    height: 450px;
+    background: radial-gradient(circle, hsla(170 60% 45% / 0.25), transparent 70%);
+    bottom: -10%;
+    left: 30%;
+    animation-delay: -14s;
+  }
+
+  .log-info {
+    color: hsl(200 60% 60%);
+  }
+
+  .log-warning {
+    color: hsl(40 80% 60%);
+  }
+
+  .log-error {
+    color: hsl(0 70% 60%);
+  }
+
+  .log-debug {
+    color: hsl(220 15% 55%);
+  }
+
+  .log-agent {
+    color: hsl(260 60% 70%);
+  }
+}
+
+@keyframes aurora-float {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  25% {
+    transform: translate(50px, -30px) scale(1.1);
+  }
+
+  50% {
+    transform: translate(-20px, 40px) scale(0.95);
+  }
+
+  75% {
+    transform: translate(30px, 20px) scale(1.05);
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
