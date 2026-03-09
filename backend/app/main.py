@@ -32,9 +32,9 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
         # Reset tasks left in-flight from a previous crashed/reloaded server run
         await conn.execute(text(
-            "UPDATE tasks SET status = 'failed', "
+            "UPDATE tasks SET status = 'failed'::taskstatus, "
             "final_output = 'Server restarted while task was in progress' "
-            "WHERE status IN ('pending', 'running')"
+            "WHERE status IN ('pending'::taskstatus, 'running'::taskstatus)"
         ))
     yield
 
