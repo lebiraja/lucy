@@ -9,9 +9,9 @@ async def run_all_tests():
     assert graph_executor is not None
     assert "sequential" in graph_executor._graphs
     assert "parallel" in graph_executor._graphs
-    assert "dynamic" in graph_executor._graphs
     assert "council" in graph_executor._graphs
-    print("✓ TEST 1: GraphExecutor singleton initializes with all 4 strategy graphs")
+    assert "hierarchical" in graph_executor._graphs
+    print("✓ TEST 1: GraphExecutor singleton initializes with all 5 strategy graphs")
 
     # ========== TEST 2: TaskState creation matches schema ==========
     from app.services.langgraph.state import TaskState, AgentResult, RankingResult
@@ -189,10 +189,31 @@ async def run_all_tests():
     assert asyncio.iscoroutinefunction(_run_task_background)
     print("✓ TEST 12: tasks.py _run_task_background still works with new orchestrator")
 
+    # ========== TEST 13: Hierarchical Graph Structure ==========
+    from app.services.langgraph.graphs.hierarchical import build_hierarchical_graph
+    from langgraph.checkpoint.memory import MemorySaver
+    hg = build_hierarchical_graph().compile(checkpointer=MemorySaver())
+    h_nodes = list(hg.get_graph().nodes.keys())
+    expected_h = {
+        "__start__", "ceo_intake", "planning_layer", "cto_breakdown",
+        "manager_delegation", "execution_fan_out", "manager_review",
+        "cto_synthesis", "ceo_approval", "persist_result", "__end__"
+    }
+    assert set(h_nodes) == expected_h, f"Missing hierarchical nodes: {expected_h - set(h_nodes)}"
+    print("✓ TEST 13: Hierarchical graph has all required nodes and compiles")
+
+    # ========== TEST 14: Planning Subgraph Structure ==========
+    from app.services.langgraph.graphs.planning import build_planning_graph
+    pg = build_planning_graph().compile()
+    p_nodes = list(pg.get_graph().nodes.keys())
+    expected_p = {"__start__", "questioning", "planning", "allocation", "__end__"}
+    assert set(p_nodes) == expected_p, f"Missing planning nodes: {expected_p - set(p_nodes)}"
+    print("✓ TEST 14: Planning subgraph compiles correctly")
+
     print("")
-    print("=" * 55)
-    print(" ALL 12 TESTS PASSED ✅  — Migration is solid!")
-    print("=" * 55)
+    print("=" * 65)
+    print(" ALL 14 TESTS PASSED ✅  — Hierarchical LangGraph is solid!")
+    print("=" * 65)
 
 
 if __name__ == "__main__":

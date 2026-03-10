@@ -7,6 +7,7 @@ import type { AgentConfig, AgentRole } from "@/types/lucy";
 import {
   Bot, Plus, Play, Pause, Square, Trash2, Activity, Crown, Shield,
   Users, User, ChevronRight, Pencil, Loader2, Zap, CheckCircle2, XCircle,
+  Brain, HelpCircle, Briefcase, Code, Bug
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
@@ -18,14 +19,32 @@ import { useToast } from "@/hooks/use-toast";
 const roleIcons: Record<AgentRole, React.ElementType> = {
   ceo: Crown,
   cto: Shield,
+  cfo: Briefcase,
+  planner: Brain,
+  questioner: HelpCircle,
+  hr_manager: Users,
+  backend_manager: Users,
+  frontend_manager: Users,
+  qa_manager: Users,
   manager: Users,
+  developer: Code,
+  tester: Bug,
   employee: User,
 };
 
 const roleColors: Record<AgentRole, string> = {
   ceo: "text-primary",
   cto: "text-secondary",
+  cfo: "text-secondary",
+  planner: "text-accent",
+  questioner: "text-accent",
+  hr_manager: "text-accent",
+  backend_manager: "text-accent",
+  frontend_manager: "text-accent",
+  qa_manager: "text-accent",
   manager: "text-accent",
+  developer: "text-muted-foreground",
+  tester: "text-muted-foreground",
   employee: "text-muted-foreground",
 };
 
@@ -365,25 +384,24 @@ export default function Agents() {
                 </button>
               </div>
               {probeResult && (
-                <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${
-                  probeResult.success
+                <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${probeResult.success
                     ? "bg-accent/10 border border-accent/20 text-accent"
                     : "bg-destructive/10 border border-destructive/20 text-destructive"
-                }`}>
+                  }`}>
                   {probeResult.success
                     ? <>
-                        <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                        Detected: <strong>{probeResult.model_name}</strong>
-                        {probeResult.max_model_len && (
-                          <span className="ml-1 opacity-70">
-                            · {probeResult.max_model_len.toLocaleString()} ctx
-                            {!probeResult.context_auto_detected && " (default)"}
-                          </span>
-                        )}
-                        {probeResult.models && probeResult.models.length > 1 && (
-                          <span className="ml-1 opacity-70">({probeResult.models.length} models available)</span>
-                        )}
-                      </>
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      Detected: <strong>{probeResult.model_name}</strong>
+                      {probeResult.max_model_len && (
+                        <span className="ml-1 opacity-70">
+                          · {probeResult.max_model_len.toLocaleString()} ctx
+                          {!probeResult.context_auto_detected && " (default)"}
+                        </span>
+                      )}
+                      {probeResult.models && probeResult.models.length > 1 && (
+                        <span className="ml-1 opacity-70">({probeResult.models.length} models available)</span>
+                      )}
+                    </>
                     : <><XCircle className="w-3.5 h-3.5 shrink-0" />{probeResult.error}</>
                   }
                 </div>
@@ -406,8 +424,17 @@ export default function Agents() {
                 <label className="text-xs text-muted-foreground uppercase tracking-wider">Role</label>
                 <select className="glass-input" value={form.role} onChange={e => updateField("role", e.target.value as AgentRole)}>
                   <option value="employee">Employee</option>
+                  <option value="developer">Developer</option>
+                  <option value="tester">Tester</option>
                   <option value="manager">Manager</option>
+                  <option value="backend_manager">Backend Manager</option>
+                  <option value="frontend_manager">Frontend Manager</option>
+                  <option value="qa_manager">QA Manager</option>
+                  <option value="hr_manager">HR Manager</option>
+                  <option value="planner">Planner (Level 0.5)</option>
+                  <option value="questioner">Questioner (Level 0.5)</option>
                   <option value="cto">CTO</option>
+                  <option value="cfo">CFO</option>
                   <option value="ceo">CEO</option>
                 </select>
               </div>
@@ -581,6 +608,14 @@ export default function Agents() {
               <div className="glass-panel p-3">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Description</p>
                 <p className="text-xs text-foreground leading-relaxed">{selected.description ?? "—"}</p>
+              </div>
+              <div className="glass-panel p-3">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Capabilities</p>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {selected.capabilities?.length ? selected.capabilities.map(c => (
+                    <Badge key={c} variant="outline" className="text-[10px] bg-card">{c}</Badge>
+                  )) : <span className="text-xs text-muted-foreground">—</span>}
+                </div>
               </div>
               <button
                 onClick={() => { setSelected(null); openEdit(selected); }}

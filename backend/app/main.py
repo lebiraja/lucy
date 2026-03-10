@@ -6,13 +6,36 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
+import asyncio
+from datetime import datetime, timezone, timedelta
 
 from app.config import get_settings
-from app.database import engine, get_db
-from app.models import Base, Task, TaskStatus
-from app.routers import agents, tasks, ws
+from app.database import engine, get_db, async_session
+from app.models import Base, Task, TaskStatus, Agent, InfrastructureStatus
+from app.routers import agents, tasks, ws, projects
 
 settings = get_settings()
+
+
+async def check_agent_heartbeats():
+    """Background task to mark agents offline if heartbeats stop."""
+    while True:
+        try:
+            async with async_session() as session:
+                cutoff = datetime.now(timezone.utc) - timedelta(seconds=settings.heartbeat_timeout_seconds)
+                await session.execute(
+                    sa_update(Agent)
+                    .where(
+                        Agent.infrastructure_status == InfrastructureStatus.ONLINE,
+                        Agent.last_heartbeat != None,
+                        Agent.last_heartbeat < cutoff
+                    )
+                    .values(infrastructure_status=InfrastructureStatus.OFFLINE)
+                )
+                await session.commit()
+        except Exception:
+            pass
+        await asyncio.sleep(settings.heartbeat_check_interval)
 
 
 @asynccontextmanager
@@ -39,8 +62,13 @@ async def lifespan(app: FastAPI):
                 final_output="Server restarted while task was in progress",
             )
         )
+    
+    # Start heartbeat checker
+    heartbeat_task = asyncio.create_task(check_agent_heartbeats())
+    
     yield
 
+    heartbeat_task.cancel()
     await llm_client._http_client.aclose()
     await engine.dispose()
 
@@ -65,6 +93,7 @@ app.add_middleware(
 app.include_router(agents.router)
 app.include_router(tasks.router)
 app.include_router(ws.router)
+app.include_router(projects.router)
 
 
 @app.get("/api/health")

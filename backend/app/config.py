@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     # Timeouts (seconds)
     llm_request_timeout: float = 120.0
     health_check_timeout: float = 5.0
+    heartbeat_timeout_seconds: int = 120
+    heartbeat_check_interval: int = 60
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

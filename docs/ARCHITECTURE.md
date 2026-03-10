@@ -34,8 +34,9 @@ Lucy is a real-time orchestration platform for managing and coordinating multipl
 |---|---|
 | Frontend | React 18, TypeScript, Vite, TailwindCSS, shadcn/ui, Framer Motion |
 | Backend | FastAPI, SQLAlchemy (async), Pydantic v2, asyncpg |
+| Orchestration | **LangGraph** (StateGraph, conditional edges, MemorySaver checkpointing) |
 | Database | PostgreSQL 16 |
-| LLM Protocol | OpenAI-compatible `/v1/chat/completions` (vLLM / Ollama) |
+| LLM Protocol | OpenAI-compatible `/v1/chat/completions` (vLLM / Ollama / OpenRouter) |
 | Container | Docker Compose |
 | Proxy | nginx (SPA fallback + API proxy) |
 
@@ -52,14 +53,32 @@ lucy/
 │   │   ├── database.py      # Async SQLAlchemy engine + session factory
 │   │   ├── models.py        # ORM models (Agent, Task, TaskStep, LogEntry)
 │   │   ├── schemas.py       # Pydantic request/response schemas
-│   │   └── routers/
-│   │       ├── agents.py    # Agent CRUD + health check endpoints
-│   │       ├── tasks.py     # Task creation, listing, SSE streaming
-│   │       └── ws.py        # WebSocket log streaming
-│   └── services/
-│       ├── orchestrator.py  # 4 execution strategies (sequential/parallel/dynamic/council)
-│       ├── llm_client.py    # vLLM/Ollama HTTP client with connection pooling
-│       └── logger.py        # Real-time log broadcaster (pub/sub via asyncio.Queue)
+│   │   ├── routers/
+│   │   │   ├── agents.py    # Agent CRUD + health check endpoints
+│   │   │   ├── tasks.py     # Task creation, listing, SSE streaming
+│   │   │   └── ws.py        # WebSocket log streaming
+│   │   └── services/
+│   │       ├── orchestrator.py  # Thin adapter — delegates to LangGraph executor
+│   │       ├── llm_client.py    # vLLM/Ollama/OpenRouter HTTP client
+│   │       ├── logger.py        # Log broadcaster (pub/sub via asyncio.Queue)
+│   │       └── langgraph/       # ★ LangGraph orchestration engine
+│   │           ├── state.py         # TaskState, AgentResult, RankingResult
+│   │           ├── executor.py      # GraphExecutor (builds + runs graphs)
+│   │           ├── callbacks.py     # WebSocket log callback handlers
+│   │           ├── graphs/
+│   │           │   ├── sequential.py # Linear chain graph
+│   │           │   ├── parallel.py   # Fan-out + synthesis graph
+│   │           │   ├── dynamic.py    # Router + conditional edges
+│   │           │   ├── council.py    # 3-stage deliberation subgraph
+│   │           │   └── hierarchical.py # Multi-level agent delegation graph
+│   │           │   └── planning.py   # Level 0.5 project planning subgraph
+│   │           └── nodes/
+│   │               ├── agent_nodes.py   # run_agent_step, ROLE_SYSTEM_PROMPTS
+│   │               ├── routing_nodes.py # extract_json, ranking logic
+│   │               ├── utility_nodes.py # log_step, persist_result, fail
+│   │               ├── planning_nodes.py # Plan generation and agent allocation
+│   │               └── delegation_nodes.py # CEO intake, Manager breakdown, etc.
+│   └── test_migration.py   # 12 functional tests for LangGraph migration
 │
 ├── liquid-glass-ui/         # The active frontend (Liquid Glass theme)
 │   └── src/
@@ -81,8 +100,11 @@ lucy/
 │
 ├── docker-compose.yml
 └── docs/
-    ├── ARCHITECTURE.md  ← you are here
+    ├── ARCHITECTURE.md     ← you are here
+    ├── LANGGRAPH.md        ← LangGraph engine deep dive
+    ├── HIERARCHICAL.md     ← Hierarchical multi-agent implementation details
     ├── API.md
+    ├── MULTI_AGENT_ARCHITECTURE.md
     └── FIXES.md
 ```
 
@@ -157,19 +179,25 @@ Real-time event log attached to tasks or the system.
 
 ---
 
-## Orchestration Strategies
+## Orchestration Strategies (LangGraph)
+
+All strategies are implemented as **LangGraph StateGraphs** with typed state objects, conditional edges, and MemorySaver checkpointing. See [LANGGRAPH.md](LANGGRAPH.md) for the full engine deep dive.
 
 ### Sequential
 Agents run one after another. Each agent receives the original prompt **plus all previous responses** as context. Good for iterative refinement tasks.
 
 ```
+LangGraph: __start__ → sequential_chain → __end__
+
 Agent A ─► response A ─► Agent B (context: A) ─► response B ─► ...final = last response
 ```
 
 ### Parallel
-All agents run simultaneously receiving the identical prompt. Responses are aggregated by the orchestrator agent (if configured). Good for getting diverse perspectives quickly.
+All agents run simultaneously receiving the identical prompt. Responses are synthesized by the orchestrator agent (if configured). Good for getting diverse perspectives quickly.
 
 ```
+LangGraph: __start__ → fan_out → synthesize → __end__
+
                    ┌─► Agent A ─┐
 Prompt ─► fan-out ─┤─► Agent B ─┼─► Orchestrator (synthesis) ─► final
                    └─► Agent C ─┘
@@ -179,11 +207,13 @@ Prompt ─► fan-out ─┤─► Agent B ─┼─► Orchestrator (synthesis)
 The orchestrator agent analyzes the prompt and **decides** which agents to invoke and in what order (returns a JSON routing decision). Falls back to parallel if no orchestrator is configured.
 
 ```
+LangGraph: __start__ → router → [conditional] → run_sequential or run_parallel → __end__
+
 Prompt ─► Orchestrator (routing JSON) ─► sequential or parallel sub-execution ─► final
 ```
 
 ### Council (3-Stage Deliberation)
-Modeled after CEO-led boardroom decision-making:
+Modeled after CEO-led boardroom decision-making. Implemented as a **6-node LangGraph subgraph** with conditional failure bail-out.
 
 **Stage 1 — Individual Opinions (parallel, role-aware)**
 Each agent generates their expert opinion using role-specific system prompts (CEO: strategy, CTO: technical, Manager: execution, Employee: detail).
@@ -195,9 +225,29 @@ All opinions are anonymized to labels (Response A, B, C…). Each agent reviews 
 The CEO/orchestrator agent receives all named opinions, all reviews, and the aggregate rankings. It produces the definitive final answer representing the council's collective wisdom.
 
 ```
+LangGraph: __start__ → stage1_opinions → [check] → stage2_reviews → aggregate_rankings
+                                           ↘ fail     → stage3_synthesis → persist_metadata → __end__
+
 Stage 1: All agents ─► opinions (A, B, C, D)
 Stage 2: All agents ─► anonymous review + ranking ─► aggregate leaderboard
 Stage 3: CEO agent  ─► synthesis (full context + rankings) ─► final output
+```
+
+### Hierarchical (Multi-Level Delegation)
+Modeled after a corporate management structure with a dynamic Level 0.5 planning graph.
+See [HIERARCHICAL.md](HIERARCHICAL.md) for the full architecture.
+
+**Levels:**
+- **Level 0 (CEO):** Strategic oversight and priorities
+- **Level 0.5 (Planning):** Questioning, project breakdown, dynamic agent allocation
+- **Level 2 (CTO/Exec):** Technical breakdown and synthesis
+- **Level 3 (Managers):** Checklist generation and task delegation
+- **Level 4 (Employees/Devs/QA):** Parallel task execution
+
+```
+Client ─► CEO Intake ─► L0.5 Planning ─► CTO Breakdown ─► Managers
+                                                                │
+  CEO Approval ◄─ CTO Synthesis ◄─ Manager Review ◄─ Employee Execution
 ```
 
 ---

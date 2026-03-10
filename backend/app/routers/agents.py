@@ -6,8 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import Agent, OperationalStatus, InfrastructureStatus, AgentState
-from app.schemas import AgentCreate, AgentUpdate, AgentResponse, AgentHealth
+from app.models import Agent, OperationalStatus, InfrastructureStatus, AgentState, AgentRole
+from app.schemas import (
+    AgentCreate, AgentUpdate, AgentResponse, AgentHealth,
+    AgentRegister, AgentRegisterResponse, AgentHeartbeat, AgentHeartbeatResponse
+)
 from app.services.llm_client import check_health, fetch_model_info
 
 router = APIRouter(prefix="/api/agents", tags=["agents"])
@@ -214,3 +217,115 @@ async def check_agent_health(agent_id: int, db: AsyncSession = Depends(get_db)):
         latency_ms=latency,
         error=error,
     )
+
+
+@router.post("/register", response_model=AgentRegisterResponse, status_code=201)
+async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)):
+    """Dynamic self-registration for agents."""
+    import secrets
+    from datetime import datetime, timezone
+    
+    agent_data = data.model_dump()
+    
+    # Auto-detect model if missing
+    if not agent_data.get("model_name"):
+        try:
+            info = await fetch_model_info(data.endpoint)
+            agent_data["model_name"] = info["model_name"]
+        except Exception:
+            agent_data["model_name"] = None
+
+    # Determine hierarchy level based on role
+    role_to_level = {
+        AgentRole.CEO: 0,
+        AgentRole.PLANNER: 1,
+        AgentRole.QUESTIONER: 1,
+        AgentRole.CTO: 2,
+        AgentRole.CFO: 2,
+        AgentRole.MANAGER: 3,
+        AgentRole.HR_MANAGER: 3,
+        AgentRole.BACKEND_MANAGER: 3,
+        AgentRole.FRONTEND_MANAGER: 3,
+        AgentRole.QA_MANAGER: 3,
+        AgentRole.EMPLOYEE: 4,
+        AgentRole.DEVELOPER: 4,
+        AgentRole.TESTER: 4,
+    }
+    agent_data["hierarchy_level"] = role_to_level.get(data.role, 4)
+    
+    # Generate token
+    token = secrets.token_urlsafe(32)
+    agent_data["registration_token"] = token
+    
+    # Probe initial health
+    try:
+        is_online, latency, _ = await check_health(data.endpoint)
+        if is_online:
+            agent_data["infrastructure_status"] = InfrastructureStatus.ONLINE
+            agent_data["is_warm"] = True
+            agent_data["last_heartbeat"] = datetime.now(timezone.utc)
+    except Exception:
+        pass
+        
+    agent = Agent(**agent_data)
+    db.add(agent)
+    await db.flush()
+    await db.refresh(agent)
+    
+    return AgentRegisterResponse(agent=agent, registration_token=token)
+
+
+@router.post("/heartbeat", response_model=AgentHeartbeatResponse)
+async def agent_heartbeat(data: AgentHeartbeat, db: AsyncSession = Depends(get_db)):
+    """Receive periodic heartbeat from registered agents."""
+    from datetime import datetime, timezone
+    
+    agent = await db.get(Agent, data.agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+        
+    if agent.registration_token and agent.registration_token != data.registration_token:
+        raise HTTPException(status_code=401, detail="Invalid registration token")
+        
+    now = datetime.now(timezone.utc)
+    agent.last_heartbeat = now
+    agent.infrastructure_status = InfrastructureStatus.ONLINE
+    
+    if data.status:
+        agent.operational_status = data.status
+        
+    await db.flush()
+    
+    return AgentHeartbeatResponse(success=True, acknowledged_at=now)
+
+
+@router.get("/discover", response_model=list[AgentResponse])
+async def discover_agents(
+    role: AgentRole | None = None,
+    hierarchy_level: int | None = None,
+    capability: str | None = None,
+    is_online: bool | None = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """Discover agents matching criteria."""
+    query = select(Agent)
+    
+    if role:
+        query = query.where(Agent.role == role)
+    if hierarchy_level is not None:
+        query = query.where(Agent.hierarchy_level == hierarchy_level)
+    if is_online is not None:
+        status = InfrastructureStatus.ONLINE if is_online else InfrastructureStatus.OFFLINE
+        query = query.where(Agent.infrastructure_status == status)
+        
+    result = await db.execute(query.order_by(Agent.name))
+    agents = result.scalars().all()
+    
+    # Filter by capability (in python to avoid complex JSON containment queries across diff DBs)
+    if capability:
+        agents = [
+            a for a in agents 
+            if a.capabilities and capability in a.capabilities
+        ]
+        
+    return agents

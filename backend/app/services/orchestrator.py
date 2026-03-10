@@ -42,6 +42,9 @@ async def execute_task(session: AsyncSession, task: Task, agents: list[Agent]) -
                 "model_name": a.model_name,
                 "role": a.role.value,
                 "description": a.description,
+                "capabilities": a.capabilities,
+                "available_resources": a.available_resources,
+                "hierarchy_level": a.hierarchy_level,
                 "is_orchestrator": a.is_orchestrator,
             }
             for a in agents
@@ -60,6 +63,13 @@ async def execute_task(session: AsyncSession, task: Task, agents: list[Agent]) -
             "council_reviews": [],
             "council_rankings": [],
             "label_to_agent": {},
+            "project_id": getattr(task, "project_id", None),
+            "project_plan": None,
+            "agent_allocation": None,
+            "task_breakdown": [],
+            "manager_checklists": {},
+            "hierarchy_results": [],
+            "rework_count": 0,
             "final_output": None,
             "task_status": "running",
             "error": None,

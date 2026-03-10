@@ -13,6 +13,7 @@ from app.services.langgraph.graphs.sequential import build_sequential_graph
 from app.services.langgraph.graphs.parallel import build_parallel_graph
 from app.services.langgraph.graphs.dynamic import build_dynamic_graph
 from app.services.langgraph.graphs.council import build_council_graph
+from app.services.langgraph.graphs.hierarchical import build_hierarchical_graph
 
 
 class GraphExecutor:
@@ -35,6 +36,9 @@ class GraphExecutor:
                 checkpointer=self._checkpointer,
             ),
             "council": build_council_graph().compile(
+                checkpointer=self._checkpointer,
+            ),
+            "hierarchical": build_hierarchical_graph().compile(
                 checkpointer=self._checkpointer,
             ),
         }

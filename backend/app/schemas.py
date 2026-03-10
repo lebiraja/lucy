@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from app.models import (
     TaskStrategy, TaskStatus, StepStatus, LogLevel,
     AgentRole, OperationalStatus, InfrastructureStatus, AgentState,
+    ProjectStatus,
 )
 
 
@@ -25,6 +26,9 @@ class AgentCreate(BaseModel):
     context_window_tokens: int = Field(default=4096, ge=512, le=1000000)
     max_iterations: int = Field(default=10, ge=1, le=1000)
     timeout_seconds: int = Field(default=300, ge=10, le=86400)
+    capabilities: list[str] | None = None
+    available_resources: dict | None = None
+    hierarchy_level: int = Field(default=4, ge=0, le=4)
 
 
 class AgentUpdate(BaseModel):
@@ -44,6 +48,9 @@ class AgentUpdate(BaseModel):
     context_window_tokens: int | None = Field(default=None, ge=512, le=1000000)
     max_iterations: int | None = Field(default=None, ge=1, le=1000)
     timeout_seconds: int | None = Field(default=None, ge=10, le=86400)
+    capabilities: list[str] | None = None
+    available_resources: dict | None = None
+    hierarchy_level: int | None = Field(default=None, ge=0, le=4)
 
 
 class AgentResponse(BaseModel):
@@ -69,6 +76,9 @@ class AgentResponse(BaseModel):
     avg_response_time_ms: float | None
     is_warm: bool
     last_heartbeat: datetime | None
+    capabilities: list[str] | None
+    available_resources: dict | None
+    hierarchy_level: int
     created_at: datetime
     updated_at: datetime
 
@@ -82,6 +92,33 @@ class AgentHealth(BaseModel):
     is_online: bool
     latency_ms: float | None = None
     error: str | None = None
+
+
+class AgentRegister(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    role: AgentRole
+    endpoint: str = Field(..., min_length=1, max_length=512)
+    model_name: str | None = None
+    description: str | None = None
+    capabilities: list[str] | None = None
+    available_resources: dict | None = None
+
+
+class AgentRegisterResponse(BaseModel):
+    agent: AgentResponse
+    registration_token: str
+
+
+class AgentHeartbeat(BaseModel):
+    agent_id: int
+    registration_token: str
+    status: OperationalStatus | None = None
+    metrics: dict | None = None
+
+
+class AgentHeartbeatResponse(BaseModel):
+    success: bool
+    acknowledged_at: datetime
 
 
 # ---------- Task Schemas ----------
@@ -143,3 +180,25 @@ class LogBroadcast(BaseModel):
     source: str
     message: str
     timestamp: str
+
+
+# ---------- Project Schemas ----------
+
+class ProjectCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    description: str = Field(..., min_length=1)
+
+
+class ProjectResponse(BaseModel):
+    id: int
+    name: str
+    description: str
+    status: ProjectStatus
+    plan: dict | None = None
+    agent_allocation: dict | None = None
+    phases: list[dict] | None = None
+    created_at: datetime
+    completed_at: datetime | None
+    tasks: list[TaskResponse] = []
+
+    model_config = {"from_attributes": True}

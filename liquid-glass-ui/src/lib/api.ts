@@ -1,4 +1,4 @@
-import type { AgentConfig, Task, LogEntry, SystemHealth } from "@/types/lucy";
+import type { AgentConfig, Task, LogEntry, SystemHealth, Project } from "@/types/lucy";
 
 const API_BASE = "/api";
 
@@ -56,7 +56,7 @@ export const api = {
         if (!res.ok) throw new Error("Failed to check agent health");
         return res.json();
     },
-    probeEndpoint: async (endpoint: string): Promise<{ success: boolean; model_name?: string; models?: string[]; error?: string }> => {
+    probeEndpoint: async (endpoint: string): Promise<{ success: boolean; model_name?: string; models?: string[]; max_model_len?: number; recommended_max_tokens?: number; context_auto_detected?: boolean; error?: string }> => {
         const res = await fetch(`${API_BASE}/agents/probe`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -89,6 +89,32 @@ export const api = {
             body: JSON.stringify(taskParams),
         });
         if (!res.ok) throw new Error("Failed to create task");
+        return res.json();
+    },
+
+    // Projects
+    getProjects: async (): Promise<Project[]> => {
+        const res = await fetch(`${API_BASE}/projects`);
+        if (!res.ok) throw new Error("Failed to fetch projects");
+        return res.json();
+    },
+    getProject: async (id: number): Promise<Project> => {
+        const res = await fetch(`${API_BASE}/projects/${id}`);
+        if (!res.ok) throw new Error("Failed to fetch project");
+        return res.json();
+    },
+    createProject: async (projectParams: { name: string; description: string }): Promise<Project> => {
+        const res = await fetch(`${API_BASE}/projects`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(projectParams),
+        });
+        if (!res.ok) throw new Error("Failed to create project");
+        return res.json();
+    },
+    executeProject: async (id: number): Promise<Project> => {
+        const res = await fetch(`${API_BASE}/projects/${id}/execute`, { method: "POST" });
+        if (!res.ok) throw new Error("Failed to execute project");
         return res.json();
     },
 

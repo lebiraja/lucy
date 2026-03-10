@@ -67,3 +67,12 @@ class TaskState(TypedDict, total=False):
     final_output: str | None
     task_status: str  # "running" | "completed" | "failed"
     error: str | None
+
+    # ── Hierarchical delegation ──
+    project_id: int | None
+    project_plan: dict | None           # parsed plan from L0.5 planner
+    agent_allocation: dict | None       # {role: count} from allocation node
+    task_breakdown: list[dict]          # from CTO: [{task, assigned_to_role, status}]
+    manager_checklists: dict            # {manager_id: [{item, status, assigned_to_agent_id}]}
+    hierarchy_results: Annotated[list[dict], operator.add]  # generic parallel-safe reducer
+    rework_count: int                   # loop guard for manager review cycle

@@ -2,7 +2,7 @@
 
 **Current Date:** March 10, 2026  
 **Project:** Lucy — Multi-Agent Orchestration Platform  
-**Language/Framework:** Python + FastAPI with AsyncIO
+**Language/Framework:** Python + FastAPI with LangGraph
 
 ---
 
@@ -84,16 +84,18 @@ Lucy is a **multi-agent orchestration platform** that coordinates multiple LLM a
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
-| **Backend Framework** | FastAPI (Python 3.11+) | Async HTTP API server |
-| **Concurrency** | `asyncio.gather()` | Parallel agent execution |
+| **Backend Framework** | FastAPI (Python 3.12+) | Async HTTP API server |
+| **Orchestration** | LangGraph (StateGraph) | Graph-based agent workflow execution |
+| **Concurrency** | `asyncio.gather()` inside LangGraph nodes | Parallel agent execution |
 | **HTTP Client** | `httpx` (async) | Non-blocking LLM requests with connection pooling |
 | **Database ORM** | SQLAlchemy (async) | Model persistence & transactions |
-| **Database** | SQLite / PostgreSQL | Task, agent, and log storage |
+| **Database** | PostgreSQL 16 | Task, agent, and log storage |
 | **Real-Time Comms** | WebSocket | Live log streaming to frontend |
 | **Server Streaming** | SSE (Server-Sent Events) | Progressive task updates |
 | **LLM Access** | OpenRouter API | Unified endpoint for multiple models |
 | **Frontend** | React 18 (Vite) | UI for task creation & monitoring |
-| **State Mgmt** | AsyncSession (SQLAlchemy) | DB transaction management |
+| **State Mgmt** | LangGraph TaskState (TypedDict) | Typed state flowing through graphs |
+| **Checkpointing** | LangGraph MemorySaver | In-memory state snapshots per task |
 
 ---
 
@@ -137,15 +139,18 @@ Lucy is a **multi-agent orchestration platform** that coordinates multiple LLM a
 │              Services Layer (services/)                          │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐   │
-│  │ orchestrator.py - Core Execution Engine                  │   │
+│  │ orchestrator.py - Thin Adapter                           │   │
 │  │  • execute_task(session, task, agents)                   │   │
-│  │  • execute_sequential(session, task, agents)             │   │
-│  │  • execute_parallel(session, task, agents)               │   │
-│  │  • execute_dynamic(session, task, agents)                │   │
-│  │  • execute_council(session, task, agents)                │   │
-│  │  • _run_step(task_id, agent, prompt, step_order)         │   │
-│  │  • parse_ranking_from_text() [Council rankings]          │   │
-│  │  • calculate_aggregate_rankings()  [Council synthesis]   │   │
+│  │  • Serializes agents → LangGraph state                  │   │
+│  │  • Delegates to GraphExecutor.run()                     │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │ langgraph/ - LangGraph Orchestration Engine               │   │
+│  │  • executor.py    — GraphExecutor (builds+caches graphs) │   │
+│  │  • state.py       — TaskState, AgentResult, RankingResult│   │
+│  │  • graphs/        — sequential, parallel, dynamic, council│  │
+│  │  • nodes/         — agent_nodes, routing_nodes, utility  │   │
 │  └──────────────────────────────────────────────────────────┘   │
 │                                                                  │
 │  ┌──────────────────────────────────────────────────────────┐   │
@@ -366,7 +371,8 @@ User Query
     Final (C)
 ```
 
-**Code:** `orchestrator.execute_sequential()`  
+**Code:** `graphs/sequential.py` — `build_sequential_graph()` → `sequential_chain_node()`  
+**LangGraph:** `__start__` → `sequential_chain` → `__end__`  
 **Use Case:** Iterative refinement, build on previous answers  
 **Communication:** One-directional chain, synchronous
 
@@ -402,7 +408,8 @@ User Query
               Final Synthesis
 ```
 
-**Code:** `orchestrator.execute_parallel()` then `_run_step()` with synthesizer  
+**Code:** `graphs/parallel.py` — `build_parallel_graph()` → `parallel_fan_out_node()` + `synthesize_parallel_node()`  
+**LangGraph:** `__start__` → `fan_out` → `synthesize` → `__end__`  
 **Use Case:** Multiple expert opinions, then consensus  
 **Communication:** Fan-out then fan-in; gather results asynchronously
 
@@ -440,7 +447,8 @@ User Query
         Final Output
 ```
 
-**Code:** `orchestrator.execute_dynamic()`  
+**Code:** `graphs/dynamic.py` — `build_dynamic_graph()` → `dynamic_router_node()` → conditional edge  
+**LangGraph:** `__start__` → `router` → `[conditional]` → `run_sequential` or `run_parallel` → `__end__`  
 **Use Case:** Complex tasks where routing depends on query analysis  
 **Communication:** First, query orchestrator; then execute based on response
 
@@ -514,12 +522,17 @@ User Query
 ```
 
 **Code:**  
-- Stage 1: `orchestrator.execute_council()` → `asyncio.gather(get_opinion(...))`
-- Stage 2: Anonymous labels (A, B, C, D) → `asyncio.gather(review_anonymous(...))`
-- Stage 3: `parse_ranking_from_text()` → `calculate_aggregate_rankings()` → CEO synthesis
+- `graphs/council.py` — `build_council_graph()` (6-node LangGraph subgraph)
+- Stage 1: `opinion_fan_out_node()` → `asyncio.gather(run_agent_step(...))`
+- Stage 2: `review_fan_out_node()` → anonymous labels → `asyncio.gather(run_agent_step(...))`
+- Stage 3: `aggregate_rankings_node()` → `synthesis_node()` → `persist_council_metadata_node()`
+
+**LangGraph:** `__start__` → `stage1_opinions` → `[check]` → `stage2_reviews` → `aggregate_rankings` → `stage3_synthesis` → `persist_metadata` → `__end__` (with `fail` branch from `[check]`)
 
 **Use Case:** High-stakes decisions, complex analysis, academic-style peer review  
-**Communication:** 3-phase: parallel opinions → anonymous review → named synthesis
+**Communication:** 3-phase: parallel opinions → anonymous review → named synthesis  
+
+> See [LANGGRAPH.md](LANGGRAPH.md) for the full engine deep dive.
 
 ---
 

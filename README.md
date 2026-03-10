@@ -34,14 +34,28 @@ open http://localhost:2800/docs
 - **Sequential** — Chain agents one after another, each building on the previous response
 - **Parallel** — Fan-out the prompt to all agents, then aggregate using the orchestrator
 - **Dynamic** — Lucy (the orchestrator agent) analyzes the query and decides which agents to use
+- **Council** — Agents give independent opinions, anonymously review peers, and CTO/CEO synthesizes
+- **Hierarchical (New)** — A full Level 0-to-4 corporate hierarchy. Uses a dynamic L0.5 planning agent to allocate nodes, a CTO to break down tasks, Managers to assign checklists, and Employees to execute in parallel, bubbling back up for CEO approval. Use the `/api/projects` endpoint.
 
 ## Adding an Agent
 
-1. Open the admin panel at `http://localhost:3000`
+Agents can now self-register dynamically using the REST API:
+```bash
+POST /api/agents/register
+{
+  "name": "Backend DevOps",
+  "role": "manager",
+  "endpoint": "http://192.168.73.41:9002",
+  "capabilities": ["docker", "ci/cd"]
+}
+```
+*Note: Agents must send periodic heartbeats to `/api/agents/heartbeat` or they will be marked offline automatically.*
+
+Alternatively, via the Admin UI:
+1. Open the admin panel at `http://localhost:2000`
 2. Go to **Agents** tab
 3. Click **+ Add Agent**
-4. Enter the vLLM endpoint (e.g., `http://192.168.73.41:9002`), model name, and role
-5. Toggle **Orchestrator Brain** if this agent should be the orchestrator
+4. Enter the vLLM/OpenRouter endpoint, model name, and select a hierarchical role (CEO, Planner, CTO, Manager, Developer, etc).
 
 ## Environment Variables
 

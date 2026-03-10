@@ -1,4 +1,4 @@
-export type AgentRole = "ceo" | "cto" | "manager" | "employee";
+export type AgentRole = "ceo" | "cto" | "cfo" | "planner" | "questioner" | "hr_manager" | "backend_manager" | "frontend_manager" | "qa_manager" | "manager" | "employee" | "developer" | "tester";
 export type AgentState =
   | "idle"
   | "assigned"
@@ -14,7 +14,7 @@ export type AgentState =
   | "paused"
   | "error";
 export type TaskStatus = "pending" | "running" | "completed" | "failed";
-export type Strategy = "sequential" | "parallel" | "dynamic" | "council";
+export type Strategy = "sequential" | "parallel" | "dynamic" | "council" | "hierarchical";
 export type LogLevel = "info" | "warning" | "error" | "debug" | "agent";
 
 export interface AgentConfig {
@@ -44,6 +44,9 @@ export interface AgentConfig {
   last_heartbeat: string | null;
   created_at: string;
   updated_at: string;
+  capabilities: string[] | null;
+  available_resources: any | null;
+  hierarchy_level: number;
 }
 
 export interface TaskStep {
@@ -70,8 +73,20 @@ export interface CouncilMeta {
     rankings_count: number;
     label: string;
   }[];
-  opinions: { agent_id: number; agent_name: string; agent_role: string; response: string }[];
   reviews: { agent_id: number; agent_name: string; agent_role: string; response: string; parsed_ranking: string[] }[];
+}
+
+export interface Project {
+  id: number;
+  name: string;
+  description: string;
+  status: "pending" | "planning" | "active" | "completed" | "failed";
+  plan: any | null;
+  agent_allocation: any | null;
+  phases: any[] | null;
+  created_at: string;
+  completed_at: string | null;
+  tasks: Task[];
 }
 
 export interface Task {
