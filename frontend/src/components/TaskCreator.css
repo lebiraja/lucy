@@ -1,0 +1,80 @@
+.task-creator {
+    max-width: 1000px;
+}
+
+.task-form {
+    margin-bottom: var(--space-xl);
+}
+
+.form-row {
+    display: flex;
+    gap: var(--space-lg);
+    margin-bottom: var(--space-md);
+}
+
+.flex-grow {
+    flex: 1;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+}
+
+.agent-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.agent-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-left: 4px;
+    border-left: 2px solid var(--border-color);
+    margin-left: 8px;
+    padding-top: 4px;
+}
+
+.btn-execute {
+    padding: 12px 32px;
+    font-size: 0.95rem;
+    letter-spacing: 0.03em;
+}
+
+/* ===== Execution Results ===== */
+
+.execution-results {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    animation: fadeIn 0.3s ease;
+}
+
+.running-indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    justify-content: center;
+    padding: var(--space-lg);
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.running-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.current-stage {
+    font-size: 0.8rem;
+    color: var(--accent);
+    font-weight: 600;
+}

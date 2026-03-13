@@ -1,0 +1,37 @@
+"""Application settings loaded from environment variables."""
+
+from pydantic_settings import BaseSettings
+from functools import lru_cache
+
+
+class Settings(BaseSettings):
+    """Central configuration for the Lucy backend."""
+
+    # Database
+    database_url: str = "postgresql+asyncpg://lucy:lucy_secret@db:5432/lucy_db"
+
+    # Server
+    backend_port: int = 8000
+    frontend_port: int = 3010
+
+    # CORS — allow frontend origin (override with CORS_ORIGINS env var, comma-separated)
+    cors_origins: list[str] = ["http://localhost:3010", "http://127.0.0.1:3010", "http://localhost:5173"]
+
+    # vLLM defaults
+    default_temperature: float = 0.7
+    default_max_tokens: int = 2048
+    default_top_p: float = 0.95
+
+    # Redis (memory / vector DB)
+    redis_url: str = "redis://redis:6379/0"
+
+    # Timeouts (seconds)
+    llm_request_timeout: float = 120.0
+    health_check_timeout: float = 5.0
+
+    model_config = {"env_file": ".env", "extra": "ignore"}
+
+
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
