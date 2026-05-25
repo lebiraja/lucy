@@ -16,6 +16,7 @@ from app.models import Agent, OperationalStatus
 from app.services.langgraph.state import TaskState, AgentResult
 from app.services.langgraph.nodes.agent_nodes import run_agent_step
 from app.services.langgraph.nodes.utility_nodes import log_step
+from app.services.langgraph.nodes.output_nodes import build_structured_output_node
 
 
 async def parallel_fan_out_node(state: TaskState) -> dict:
@@ -23,11 +24,17 @@ async def parallel_fan_out_node(state: TaskState) -> dict:
     task_id = state["task_id"]
     agents = state["agents"]
     prompt = state["prompt"]
+    workspace_dir = state.get("workspace_dir")
+    conversation_history = state.get("conversation_history") or []
 
     await log_step(task_id, f"Starting PARALLEL execution with {len(agents)} agents")
 
     async def run_one(agent_dict: dict, order: int) -> AgentResult:
-        return await run_agent_step(task_id, agent_dict, prompt, step_order=order)
+        return await run_agent_step(
+            task_id, agent_dict, prompt, step_order=order,
+            workspace_dir=workspace_dir,
+            conversation_history=conversation_history,
+        )
 
     results = await asyncio.gather(
         *[run_one(a, i) for i, a in enumerate(agents)],
@@ -91,6 +98,7 @@ async def synthesize_parallel_node(state: TaskState) -> dict:
         orch_dict = {"id": orch.id, "name": orch.name, "role": orch.role.value}
         synth = await run_agent_step(
             task_id, orch_dict, synthesis_prompt, step_order=len(responses),
+            workspace_dir=state.get("workspace_dir"),
         )
 
         if synth.status == "completed":
@@ -104,11 +112,12 @@ async def synthesize_parallel_node(state: TaskState) -> dict:
 
 
 def build_parallel_graph() -> StateGraph:
-    """Build a LangGraph StateGraph for parallel agent execution."""
     graph = StateGraph(TaskState)
     graph.add_node("fan_out", parallel_fan_out_node)
     graph.add_node("synthesize", synthesize_parallel_node)
+    graph.add_node("structured_output", build_structured_output_node)
     graph.add_edge(START, "fan_out")
     graph.add_edge("fan_out", "synthesize")
-    graph.add_edge("synthesize", END)
+    graph.add_edge("synthesize", "structured_output")
+    graph.add_edge("structured_output", END)
     return graph

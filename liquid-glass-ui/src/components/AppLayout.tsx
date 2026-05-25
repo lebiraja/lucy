@@ -1,11 +1,13 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import AuroraBackground from "@/components/AuroraBackground";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 export default function AppLayout() {
+  const location = useLocation();
+  const isChat = location.pathname.startsWith("/chat");
   const { data: health } = useQuery({
     queryKey: ["health"],
     queryFn: api.getHealth,
@@ -31,7 +33,7 @@ export default function AppLayout() {
               </div>
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-6">
+          <main className={`flex-1 overflow-hidden ${isChat ? "" : "overflow-auto p-6"}`}>
             <Outlet />
           </main>
         </div>

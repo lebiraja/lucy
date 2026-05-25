@@ -180,7 +180,7 @@ async def stream_task_events(task_id: int, request: Request, db: AsyncSession = 
             yield f"data: {payload}\n\n"
             return
 
-        queue = log_broadcaster.subscribe(task_id=task_id)
+        queue = await log_broadcaster.subscribe(task_id=task_id)
         try:
             while True:
                 # Respect client disconnect

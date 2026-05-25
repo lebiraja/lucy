@@ -160,6 +160,56 @@ class TaskStepResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ---------- Session Schemas ----------
+
+class SessionCreate(BaseModel):
+    title: str | None = None
+    strategy: TaskStrategy = TaskStrategy.DYNAMIC
+    agent_ids: list[int] | None = None
+
+
+class MessageCreate(BaseModel):
+    content: str = Field(..., min_length=1)
+
+
+class ToolCallRecordResponse(BaseModel):
+    id: int
+    tool_name: str
+    agent_name: str
+    input_args: dict | None = None
+    output: dict | None = None
+    duration_ms: int | None = None
+    status: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class MessageResponse(BaseModel):
+    id: int
+    session_id: int
+    role: str
+    content: str
+    structured: dict | None = None
+    task_id: int | None = None
+    created_at: datetime
+    tool_calls: list[ToolCallRecordResponse] = []
+
+    model_config = {"from_attributes": True}
+
+
+class SessionResponse(BaseModel):
+    id: int
+    title: str | None
+    strategy: TaskStrategy
+    agent_ids: list[int] | None = None
+    created_at: datetime
+    updated_at: datetime
+    messages: list[MessageResponse] = []
+
+    model_config = {"from_attributes": True}
+
+
 # ---------- Log Schemas ----------
 
 class LogEntryResponse(BaseModel):

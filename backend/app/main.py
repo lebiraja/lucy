@@ -12,7 +12,7 @@ from datetime import datetime, timezone, timedelta
 from app.config import get_settings
 from app.database import engine, get_db, async_session
 from app.models import Base, Task, TaskStatus, Agent, InfrastructureStatus
-from app.routers import agents, tasks, ws, projects
+from app.routers import agents, tasks, ws, projects, sessions
 
 settings = get_settings()
 
@@ -94,6 +94,7 @@ app.include_router(agents.router)
 app.include_router(tasks.router)
 app.include_router(ws.router)
 app.include_router(projects.router)
+app.include_router(sessions.router)
 
 
 @app.get("/api/health")

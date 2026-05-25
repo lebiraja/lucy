@@ -32,6 +32,7 @@ services:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./backend:/app
+      - lucy_workspace:/tmp/lucy-workspace
     depends_on:
       db:
         condition: service_healthy
@@ -52,4 +53,6 @@ services:
 
 volumes:
   lucy_pgdata:
+    driver: local
+  lucy_workspace:
     driver: local

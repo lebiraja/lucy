@@ -27,6 +27,7 @@ from app.services.langgraph.nodes.routing_nodes import (
     calculate_aggregate_rankings,
 )
 from app.services.langgraph.nodes.utility_nodes import log_step
+from app.services.langgraph.nodes.output_nodes import build_structured_output_node
 
 
 # ---------- Stage 1: Individual Opinions ----------
@@ -36,6 +37,8 @@ async def opinion_fan_out_node(state: TaskState) -> dict:
     task_id = state["task_id"]
     agents = state["agents"]
     prompt = state["prompt"]
+    workspace_dir = state.get("workspace_dir")
+    conversation_history = state.get("conversation_history") or []
 
     await log_step(task_id, "📋 STAGE 1: Collecting individual opinions from all agents...")
 
@@ -50,6 +53,8 @@ async def opinion_fan_out_node(state: TaskState) -> dict:
         )
         return await run_agent_step(
             task_id, agent_dict, full_prompt, step_order=order, step_label="opinion",
+            workspace_dir=workspace_dir,
+            conversation_history=conversation_history,
         )
 
     results = await asyncio.gather(
@@ -149,6 +154,7 @@ async def review_fan_out_node(state: TaskState) -> dict:
         return await run_agent_step(
             task_id, agent_dict, review_prompt,
             step_order=step_counter + order, step_label="review",
+            workspace_dir=state.get("workspace_dir"),
         )
 
     # Only agents that gave opinions in Stage 1 participate in review
@@ -280,6 +286,7 @@ async def synthesis_node(state: TaskState) -> dict:
     synth_result = await run_agent_step(
         task_id, ceo_dict, synthesis_prompt,
         step_order=step_counter, step_label="synthesis",
+        workspace_dir=state.get("workspace_dir"),
     )
 
     if synth_result.status == "completed":
@@ -383,8 +390,10 @@ def build_council_graph() -> StateGraph:
     )
     graph.add_edge("stage2_reviews", "aggregate_rankings")
     graph.add_edge("aggregate_rankings", "stage3_synthesis")
+    graph.add_node("structured_output", build_structured_output_node)
     graph.add_edge("stage3_synthesis", "persist_metadata")
-    graph.add_edge("persist_metadata", END)
+    graph.add_edge("persist_metadata", "structured_output")
+    graph.add_edge("structured_output", END)
     graph.add_edge("fail", END)
 
     return graph

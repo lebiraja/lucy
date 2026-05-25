@@ -18,7 +18,7 @@ class LogBroadcaster:
         self._global_subs: set[asyncio.Queue] = set()
         self._task_subs: dict[int, set[asyncio.Queue]] = {}
 
-    def subscribe(self, task_id: int | None = None) -> asyncio.Queue:
+    async def subscribe(self, task_id: int | None = None) -> asyncio.Queue:
         """Subscribe to log events. Returns a queue to listen on.
 
         - task_id=None  → global subscriber (receives ALL log messages)

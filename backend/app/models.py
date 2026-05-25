@@ -195,11 +195,78 @@ class Project(Base):
     tasks = relationship("Task", back_populates="project", order_by="Task.id")
 
 
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(255), nullable=True)
+    strategy = Column(Enum(TaskStrategy), default=TaskStrategy.DYNAMIC, nullable=False)
+    agent_ids = Column(JSON, nullable=True)  # pinned agent IDs, null = all active
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    messages = relationship("Message", back_populates="session", order_by="Message.id")
+    tasks = relationship("Task", back_populates="session")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
+    role = Column(String(16), nullable=False)  # "user" | "assistant"
+    content = Column(Text, nullable=False)
+    structured = Column(JSON, nullable=True)   # StructuredOutput dict for assistant messages
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    session = relationship("Session", back_populates="messages")
+    task = relationship("Task", back_populates="message")
+    tool_calls = relationship("ToolCallRecord", back_populates="message", order_by="ToolCallRecord.id")
+
+
+class ToolCallRecord(Base):
+    __tablename__ = "tool_calls"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    message_id = Column(Integer, ForeignKey("messages.id", ondelete="CASCADE"), nullable=False)
+    tool_name = Column(String(64), nullable=False)
+    agent_name = Column(String(255), nullable=False)
+    input_args = Column(JSON, nullable=True)
+    output = Column(JSON, nullable=True)
+    duration_ms = Column(Integer, nullable=True)
+    status = Column(String(16), nullable=False, default="success")  # "success" | "error"
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    message = relationship("Message", back_populates="tool_calls")
+
+
 class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
+    session_id = Column(Integer, ForeignKey("sessions.id", ondelete="SET NULL"), nullable=True)
     prompt = Column(Text, nullable=False)
     strategy = Column(Enum(TaskStrategy), nullable=False)
     status = Column(Enum(TaskStatus), default=TaskStatus.PENDING, nullable=False)
@@ -215,6 +282,8 @@ class Task(Base):
 
     # Relationships
     project = relationship("Project", back_populates="tasks")
+    session = relationship("Session", back_populates="tasks")
+    message = relationship("Message", back_populates="task", uselist=False)
     steps = relationship("TaskStep", back_populates="task", order_by="TaskStep.step_order")
     logs = relationship("LogEntry", back_populates="task", order_by="LogEntry.timestamp")
 

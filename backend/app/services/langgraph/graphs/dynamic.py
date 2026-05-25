@@ -17,6 +17,7 @@ from app.services.langgraph.state import TaskState
 from app.services.langgraph.nodes.agent_nodes import run_agent_step
 from app.services.langgraph.nodes.routing_nodes import extract_json
 from app.services.langgraph.nodes.utility_nodes import log_step
+from app.services.langgraph.nodes.output_nodes import build_structured_output_node
 from app.services.langgraph.graphs.sequential import sequential_chain_node
 from app.services.langgraph.graphs.parallel import (
     parallel_fan_out_node,
@@ -145,12 +146,12 @@ async def apply_parallel(state: TaskState) -> dict:
 
 
 def build_dynamic_graph() -> StateGraph:
-    """Build a LangGraph StateGraph for dynamic routing strategy."""
     graph = StateGraph(TaskState)
 
     graph.add_node("router", dynamic_router_node)
     graph.add_node("run_sequential", apply_sequential)
     graph.add_node("run_parallel", apply_parallel)
+    graph.add_node("structured_output", build_structured_output_node)
 
     graph.add_edge(START, "router")
     graph.add_conditional_edges(
@@ -158,7 +159,8 @@ def build_dynamic_graph() -> StateGraph:
         route_after_decision,
         {"sequential": "run_sequential", "parallel": "run_parallel"},
     )
-    graph.add_edge("run_sequential", END)
-    graph.add_edge("run_parallel", END)
+    graph.add_edge("run_sequential", "structured_output")
+    graph.add_edge("run_parallel", "structured_output")
+    graph.add_edge("structured_output", END)
 
     return graph

@@ -65,8 +65,15 @@ class TaskState(TypedDict, total=False):
 
     # ── Output ──
     final_output: str | None
+    structured_output: dict | None   # rich structured output for frontend rendering
     task_status: str  # "running" | "completed" | "failed"
     error: str | None
+
+    # ── Session / conversation context ──
+    session_id: int | None
+    conversation_history: list[dict]   # [{"role": "user"|"assistant", "content": str}]
+    tool_calls: Annotated[list[dict], operator.add]  # accumulated tool call records
+    workspace_dir: str | None          # session-scoped sandbox dir
 
     # ── Hierarchical delegation ──
     project_id: int | None
