@@ -33,6 +33,18 @@ class Settings(BaseSettings):
     # Timeouts (seconds)
     llm_request_timeout: float = 120.0
     health_check_timeout: float = 5.0
+    heartbeat_timeout_seconds: int = 120
+    heartbeat_check_interval: int = 60
+
+    # Tool API keys
+    serper_api_key: str = ""
+    news_api_key: str = ""
+
+    # Tool execution settings
+    workspace_base_dir: str = "/tmp/lucy-workspace"
+    code_execution_timeout: int = 30
+    shell_execution_timeout: int = 10
+    max_tool_iterations: int = 5
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

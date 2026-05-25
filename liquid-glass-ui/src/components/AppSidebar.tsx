@@ -1,4 +1,4 @@
-import { LayoutDashboard, Bot, ListTodo, Clock, Activity } from "lucide-react";
+import { LayoutDashboard, Bot, ListTodo, Clock, Activity, FolderTree, MessageSquare } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -14,7 +14,9 @@ import {
 
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "Chat", url: "/chat", icon: MessageSquare },
   { title: "Agents", url: "/agents", icon: Bot },
+  { title: "Projects", url: "/projects", icon: FolderTree },
   { title: "New Task", url: "/tasks", icon: ListTodo },
   { title: "History", url: "/history", icon: Clock },
   { title: "Monitor", url: "/monitor", icon: Activity },

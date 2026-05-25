@@ -27,8 +27,17 @@ class Base(DeclarativeBase):
 class AgentRole(str, enum.Enum):
     CEO = "ceo"
     CTO = "cto"
-    MANAGER = "manager"
-    EMPLOYEE = "employee"
+    CFO = "cfo"
+    PLANNER = "planner"         # Level 0.5 planning agent
+    QUESTIONER = "questioner"   # Level 0.5 questioning agent
+    HR_MANAGER = "hr_manager"
+    BACKEND_MANAGER = "backend_manager"
+    FRONTEND_MANAGER = "frontend_manager"
+    QA_MANAGER = "qa_manager"
+    MANAGER = "manager"         # generic manager
+    EMPLOYEE = "employee"       # generic employee
+    DEVELOPER = "developer"
+    TESTER = "tester"
 
 
 class OperationalStatus(str, enum.Enum):
@@ -62,6 +71,15 @@ class TaskStrategy(str, enum.Enum):
     PARALLEL = "parallel"
     DYNAMIC = "dynamic"
     COUNCIL = "council"
+    HIERARCHICAL = "hierarchical"
+
+
+class ProjectStatus(str, enum.Enum):
+    PENDING = "pending"
+    PLANNING = "planning"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class TaskStatus(str, enum.Enum):
@@ -96,6 +114,12 @@ class Agent(Base):
     endpoint = Column(String(512), nullable=False)  # e.g. http://192.168.73.41:9002
     model_name = Column(String(255), nullable=True)  # auto-detected from endpoint
     description = Column(Text, nullable=True)
+
+    # Dynamic registration metadata
+    capabilities = Column(JSON, nullable=True)         # e.g., ["code_review", "testing"]
+    available_resources = Column(JSON, nullable=True)  # e.g., {"gpu": true, "memory_gb": 16}
+    hierarchy_level = Column(Integer, default=4, nullable=False) # 0=CEO, 1=Planning, 2=Exec, 3=Mgr, 4=Emp
+    registration_token = Column(String(255), nullable=True)  # for self-registration auth
 
     # Hierarchical role system
     role = Column(Enum(AgentRole), default=AgentRole.EMPLOYEE, nullable=False)
@@ -149,10 +173,100 @@ class Agent(Base):
     parent = relationship("Agent", back_populates="children", remote_side=[id])
 
 
+class Project(Base):
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)         # client requirements
+    status = Column(Enum(ProjectStatus), default=ProjectStatus.PENDING, nullable=False)
+    plan = Column(JSON, nullable=True)                  # generated plan from L0.5
+    agent_allocation = Column(JSON, nullable=True)      # {role: count} from planner
+    phases = Column(JSON, nullable=True)                # [{name, tasks, status}]
+    
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    tasks = relationship("Task", back_populates="project", order_by="Task.id")
+
+
+class Session(Base):
+    __tablename__ = "sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(255), nullable=True)
+    strategy = Column(Enum(TaskStrategy), default=TaskStrategy.DYNAMIC, nullable=False)
+    agent_ids = Column(JSON, nullable=True)  # pinned agent IDs, null = all active
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    messages = relationship("Message", back_populates="session", order_by="Message.id")
+    tasks = relationship("Task", back_populates="session")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
+    role = Column(String(16), nullable=False)  # "user" | "assistant"
+    content = Column(Text, nullable=False)
+    structured = Column(JSON, nullable=True)   # StructuredOutput dict for assistant messages
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True)
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    session = relationship("Session", back_populates="messages")
+    task = relationship("Task", back_populates="message")
+    tool_calls = relationship("ToolCallRecord", back_populates="message", order_by="ToolCallRecord.id")
+
+
+class ToolCallRecord(Base):
+    __tablename__ = "tool_calls"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    message_id = Column(Integer, ForeignKey("messages.id", ondelete="CASCADE"), nullable=False)
+    tool_name = Column(String(64), nullable=False)
+    agent_name = Column(String(255), nullable=False)
+    input_args = Column(JSON, nullable=True)
+    output = Column(JSON, nullable=True)
+    duration_ms = Column(Integer, nullable=True)
+    status = Column(String(16), nullable=False, default="success")  # "success" | "error"
+
+    created_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    message = relationship("Message", back_populates="tool_calls")
+
+
 class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
+    session_id = Column(Integer, ForeignKey("sessions.id", ondelete="SET NULL"), nullable=True)
     prompt = Column(Text, nullable=False)
     strategy = Column(Enum(TaskStrategy), nullable=False)
     status = Column(Enum(TaskStatus), default=TaskStatus.PENDING, nullable=False)
@@ -167,6 +281,9 @@ class Task(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
+    project = relationship("Project", back_populates="tasks")
+    session = relationship("Session", back_populates="tasks")
+    message = relationship("Message", back_populates="task", uselist=False)
     steps = relationship("TaskStep", back_populates="task", order_by="TaskStep.step_order")
     logs = relationship("LogEntry", back_populates="task", order_by="LogEntry.timestamp")
 

@@ -1,4 +1,4 @@
-export type AgentRole = "ceo" | "cto" | "manager" | "employee";
+export type AgentRole = "ceo" | "cto" | "cfo" | "planner" | "questioner" | "hr_manager" | "backend_manager" | "frontend_manager" | "qa_manager" | "manager" | "employee" | "developer" | "tester";
 export type AgentState =
   | "idle"
   | "assigned"
@@ -14,7 +14,7 @@ export type AgentState =
   | "paused"
   | "error";
 export type TaskStatus = "pending" | "running" | "completed" | "failed";
-export type Strategy = "sequential" | "parallel" | "dynamic" | "council";
+export type Strategy = "sequential" | "parallel" | "dynamic" | "council" | "hierarchical";
 export type LogLevel = "info" | "warning" | "error" | "debug" | "agent";
 
 export interface AgentConfig {
@@ -44,6 +44,9 @@ export interface AgentConfig {
   last_heartbeat: string | null;
   created_at: string;
   updated_at: string;
+  capabilities: string[] | null;
+  available_resources: Record<string, unknown> | null;
+  hierarchy_level: number;
 }
 
 export interface TaskStep {
@@ -70,8 +73,80 @@ export interface CouncilMeta {
     rankings_count: number;
     label: string;
   }[];
-  opinions: { agent_id: number; agent_name: string; agent_role: string; response: string }[];
   reviews: { agent_id: number; agent_name: string; agent_role: string; response: string; parsed_ranking: string[] }[];
+}
+
+// ---------- Tool & Structured Output ----------
+
+export interface ToolCallRecord {
+  id: number;
+  tool_name: string;
+  agent_name: string;
+  input_args: Record<string, unknown> | null;
+  output: Record<string, unknown> | null;
+  duration_ms: number | null;
+  status: "success" | "error";
+  created_at: string;
+}
+
+export interface AgentStepSummary {
+  agent_name: string;
+  agent_role: string;
+  model_name: string;
+  response: string;
+  duration_ms: number;
+  status: string;
+  step_label: string | null;
+  tool_calls: ToolCallRecord[];
+}
+
+export interface StructuredOutput {
+  final_answer: string;
+  tool_calls: ToolCallRecord[];
+  agent_steps: AgentStepSummary[];
+  rankings: CouncilMeta["aggregate_rankings"] | null;
+  files: string[] | null;
+  charts: string[] | null;  // base64 PNG strings
+  strategy_used: string;
+  execution_time_ms?: number;
+}
+
+// ---------- Sessions & Messages ----------
+
+export interface Message {
+  id: number;
+  session_id: number;
+  role: "user" | "assistant";
+  content: string;
+  structured: StructuredOutput | null;
+  task_id: number | null;
+  created_at: string;
+  tool_calls: ToolCallRecord[];
+}
+
+export interface Session {
+  id: number;
+  title: string | null;
+  strategy: Strategy;
+  agent_ids: number[] | null;
+  created_at: string;
+  updated_at: string;
+  messages: Message[];
+}
+
+// ---------- Tasks, Projects, Logs ----------
+
+export interface Project {
+  id: number;
+  name: string;
+  description: string;
+  status: "pending" | "planning" | "active" | "completed" | "failed";
+  plan: unknown | null;
+  agent_allocation: unknown | null;
+  phases: unknown[] | null;
+  created_at: string;
+  completed_at: string | null;
+  tasks: Task[];
 }
 
 export interface Task {
@@ -80,7 +155,7 @@ export interface Task {
   strategy: Strategy;
   status: TaskStatus;
   final_output: string | null;
-  task_metadata: CouncilMeta | null;
+  task_metadata: StructuredOutput | CouncilMeta | null;
   steps: TaskStep[];
   created_at: string;
   completed_at: string | null;

@@ -12,7 +12,7 @@ router = APIRouter(tags=["websocket"])
 async def websocket_global_logs(websocket: WebSocket):
     """Stream all logs globally via WebSocket."""
     await websocket.accept()
-    queue = log_broadcaster.subscribe()
+    queue = await log_broadcaster.subscribe()
 
     try:
         while True:
@@ -30,7 +30,7 @@ async def websocket_global_logs(websocket: WebSocket):
 async def websocket_task_logs(websocket: WebSocket, task_id: int):
     """Stream logs for a specific task via WebSocket."""
     await websocket.accept()
-    queue = log_broadcaster.subscribe(task_id=task_id)
+    queue = await log_broadcaster.subscribe(task_id=task_id)
 
     try:
         while True:

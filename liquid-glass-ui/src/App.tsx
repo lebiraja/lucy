@@ -7,9 +7,11 @@ import AppLayout from "@/components/AppLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Dashboard from "@/pages/Dashboard";
 import Agents from "@/pages/Agents";
+import Projects from "@/pages/Projects";
 import Tasks from "@/pages/Tasks";
 import History from "@/pages/History";
 import Monitor from "@/pages/Monitor";
+import Chat from "@/pages/Chat";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -30,7 +32,10 @@ const App = () => (
         <Routes>
           <Route element={<AppLayout />}>
             <Route path="/" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+            <Route path="/chat" element={<ErrorBoundary><Chat /></ErrorBoundary>} />
+            <Route path="/chat/:sessionId" element={<ErrorBoundary><Chat /></ErrorBoundary>} />
             <Route path="/agents" element={<ErrorBoundary><Agents /></ErrorBoundary>} />
+            <Route path="/projects" element={<ErrorBoundary><Projects /></ErrorBoundary>} />
             <Route path="/tasks" element={<ErrorBoundary><Tasks /></ErrorBoundary>} />
             <Route path="/history" element={<ErrorBoundary><History /></ErrorBoundary>} />
             <Route path="/monitor" element={<ErrorBoundary><Monitor /></ErrorBoundary>} />
