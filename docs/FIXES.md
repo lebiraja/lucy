@@ -221,3 +221,37 @@ Added `defaultOptions` to the `QueryClient` with `retry: 1` and `staleTime: 5000
 - **No authentication:** The API has no auth layer. All endpoints are publicly accessible.
 - **Context window enforcement:** Input truncation is approximate (~3.5 chars/token). Use `tiktoken` for exact token counting.
 - **WebSocket reconnection:** The frontend Monitor page polls HTTP, not WebSocket. Full WS reconnection logic is not yet implemented in the UI.
+
+---
+
+## Redesign Wave — Chat Sessions, Tool Use, Structured Output
+
+### Hierarchical rework loop was a no-op
+**File:** `backend/app/services/langgraph/graphs/hierarchical.py`
+**Root cause:** `check_rework` returned `"cto_synthesis"` on both branches of the conditional — manager rework cycles never actually fired.
+**Fix:** Conditional now routes to `manager_delegation` when `state["rework_needed"]` is true and `rework_count < 2`; otherwise proceeds to `cto_synthesis`. Wired into LangGraph via `add_conditional_edges(..., {"manager_delegation": "manager_delegation", "cto_synthesis": "cto_synthesis"})`.
+
+### Flat-text output across all strategies
+**Files:** all `backend/app/services/langgraph/graphs/*.py`, new `nodes/output_nodes.py`
+**Root cause:** Every strategy collapsed execution into a single `final_output` string. Tool calls, agent breakdown, council rankings, charts, and files were not surfaced in API responses.
+**Fix:** New `build_structured_output_node` runs as the final node in all 5 graphs. Produces a `StructuredOutput` dict (`final_answer`, `tool_calls`, `agent_steps`, `rankings`, `charts`, `files`, `strategy_used`) persisted to `Task.task_metadata` and `Message.structured`.
+
+### Agents had no real-world tools
+**Files:** new `backend/app/services/tools/` (8 files), `backend/app/services/langgraph/nodes/agent_nodes.py`
+**Root cause:** Agents could only do LLM inference on their prompt — no web search, no code execution, no file access.
+**Fix:** Built a tool system with 8 tools (web_search, news_search, run_code, run_shell, read_file, write_file, generate_chart, parse_csv), permission-gated by role. Updated `run_agent_step` with an agentic loop: parse `<tool_call>` tag → execute tool → append result → re-call LLM, up to `MAX_TOOL_ITERATIONS=5`.
+
+### Stateless tasks lost conversation context
+**Files:** new `backend/app/routers/sessions.py`, new models in `models.py`
+**Root cause:** Each task was independent — no way to have a multi-turn conversation with the agent fleet.
+**Fix:** Added `Session`, `Message`, `ToolCallRecord` ORM models with `session_id` FK on `Task`. New `/api/sessions` router with SSE streaming endpoint that persists user/assistant messages and pipes `conversation_history` into the LangGraph state so agents see prior turns.
+
+### Log broadcaster missing unsubscribe pattern
+**File:** `backend/app/services/logger.py`
+**Root cause:** Subscriber queues accumulated forever in `_task_subs` dict — memory leak risk on long-running servers.
+**Fix:** `subscribe()` made async; new sessions router properly unsubscribes its queue in a `finally` block after the SSE stream completes.
+
+### Frontend had no chat UI at all
+**Files:** new `liquid-glass-ui/src/pages/Chat.tsx`, `src/components/chat/*`
+**Root cause:** Existing UI was form-based (fill out fields, click "Execute Task", poll for result). Bad UX for multi-turn conversation.
+**Fix:** Built a Claude-style chat page with session sidebar, message bubbles, typing indicator, markdown rendering, inline charts, collapsible tool call cards, agent step accordion, and council rankings table. Chat added as primary nav item.

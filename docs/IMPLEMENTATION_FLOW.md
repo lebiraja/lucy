@@ -2,6 +2,13 @@
 
 Detailed ASCII flow diagrams showing exact code paths and data transformations.
 
+> **Status:** The diagrams below trace the original strategy execution flows. They remain accurate for the orchestration core, but the system has evolved:
+> - Each agent step now runs an **agentic tool loop** (LLM → parse `<tool_call>` → execute → re-call) instead of a single LLM call
+> - All graphs end with a `build_structured_output_node` that assembles a `StructuredOutput` dict
+> - Most tasks are now spawned from chat sessions via `POST /api/sessions/{id}/messages` (SSE-streamed) rather than the direct `POST /api/tasks` endpoint
+>
+> See [LANGGRAPH.md](LANGGRAPH.md) for the agentic loop and structured output node details, and [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for the up-to-date system overview.
+
 ---
 
 ## Table of Contents

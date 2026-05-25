@@ -1,8 +1,9 @@
 # Lucy — Multi-Agent Communication Architecture
 
-**Current Date:** March 10, 2026  
-**Project:** Lucy — Multi-Agent Orchestration Platform  
+**Project:** Lucy — Multi-Agent Orchestration Platform
 **Language/Framework:** Python + FastAPI with LangGraph
+
+> **Updated:** This document focuses on inter-agent communication. For the broader platform — conversational chat sessions, agent tool use, and structured output — see [ARCHITECTURE.md](ARCHITECTURE.md) and [TOOLS.md](TOOLS.md). Agents now also communicate indirectly via the shared session workspace (`/tmp/lucy-workspace/session_{id}/`) — one agent writes a file or chart, another agent reads it on the next step.
 
 ---
 
