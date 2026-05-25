@@ -1,5 +1,7 @@
 # Lucy — Multi-Agent Orchestration Platform
 
+> **Historical document.** This was the original implementation plan for the platform's initial build. The platform has since been completed and significantly extended (chat sessions, agent tool use, structured output). For the current architecture see [ARCHITECTURE.md](ARCHITECTURE.md); for the current API see [API.md](API.md).
+
 A platform to connect, manage, and orchestrate multiple LLM models running on lab systems via vLLM, with a central orchestrator agent (Lucy) coordinating everything.
 
 ## Architecture Overview

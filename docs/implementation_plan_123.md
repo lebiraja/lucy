@@ -1,6 +1,8 @@
 # Lucy — Hierarchical Agent System Implementation Plan
 
-Implementing the [features.md](file:///home/lebi/projects/lucy/features.md) spec in phases, starting with the most critical changes.
+> **Historical document.** This was the phased plan for adding the hierarchical multi-agent system. That work is complete. For the current architecture see [HIERARCHICAL.md](HIERARCHICAL.md).
+
+Implementing the [features.md](file:///home/lebi/projects/lucy/docs/features.md) spec in phases, starting with the most critical changes.
 
 ## Phase 1 — Foundation (This Session)
 

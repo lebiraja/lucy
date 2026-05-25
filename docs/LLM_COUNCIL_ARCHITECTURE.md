@@ -2,6 +2,8 @@
 
 > A deep-dive into how multiple AI agents deliberate, communicate, rank each other, and produce a final synthesized answer.
 
+> **Note:** Council is one of 5 orchestration strategies (alongside sequential, parallel, dynamic, hierarchical). Council agents now also have access to the tool system — they can search the web, run code, generate charts, etc. during their opinion and review stages. The CEO synthesis stage produces a `StructuredOutput` dict (not flat text) including all rankings and per-agent tool calls. See [TOOLS.md](TOOLS.md) and [LANGGRAPH.md](LANGGRAPH.md) for the current implementation.
+
 ---
 
 ## Table of Contents

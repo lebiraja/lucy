@@ -1,80 +1,117 @@
 # Lucy: Architecture & Communication Summary
 
-This document outlines the architecture and communication flow of the Lucy platform based on its repository structure and logic.
-
 ## 1. High-Level Architecture
 
-Lucy is a real-time orchestration platform designed to manage and coordinate multiple LLM agents across a network of GPU servers.
+Lucy is a conversational multi-agent orchestration platform. Users chat with sessions; the backend dispatches each message through a LangGraph strategy graph; agents use real tools (search, code execution, charts) and produce structured output rendered in the chat UI.
 
 ```mermaid
 flowchart TD
-    Client[Browser (React + Vite)]
-    Nginx[Nginx Proxy\nPort: 2000]
-    API[FastAPI Backend\nPort: 2800]
-    DB[(PostgreSQL 16\nPort: 2543\n lucy_db)]
-    vLLM[vLLM Agent Fleet\nRemote GPUs]
+    Client[Browser - React Chat UI]
+    Nginx[Nginx Proxy - Port 2000]
+    API[FastAPI Backend - Port 2800]
+    DB[(PostgreSQL 16 - lucy_db)]
+    Tools[Tool Sandbox - workspace volume]
+    Ext[External APIs - SerpAPI, NewsAPI]
+    vLLM[vLLM Agent Fleet - Remote GPUs]
 
-    Client -->|HTTP / WebSocket| Nginx
+    Client -->|HTTP / SSE / WebSocket| Nginx
     Nginx -->|Proxy /api/*| API
     Nginx -->|Serve SPA| Client
     API -->|asyncpg| DB
+    API -->|subprocess + httpx| Tools
+    Tools -->|HTTP| Ext
     API -->|HTTP POST /v1/chat/completions| vLLM
 ```
 
 ## 2. Technology Stack
 
-- **Frontend:** React 18, TypeScript, Vite, TailwindCSS, shadcn/ui.
-- **Backend:** FastAPI, SQLAlchemy (async), Pydantic v2.
-- **Database:** PostgreSQL 16.
-- **Orchestration:** LangGraph (StateGraph, conditional edges, MemorySaver).
-- **LLM Protocol:** Standard OpenAI-compatible API.
+- **Frontend:** React 18, TypeScript, Vite, TailwindCSS, shadcn/ui, react-markdown
+- **Backend:** FastAPI, SQLAlchemy async, Pydantic v2
+- **Database:** PostgreSQL 16
+- **Orchestration:** LangGraph StateGraphs with MemorySaver checkpointing
+- **Tools:** httpx (SerpAPI, NewsAPI), subprocess sandbox, matplotlib, pandas
+- **LLM Protocol:** OpenAI-compatible `/v1/chat/completions`
 
 ## 3. Communication Protocols
 
-Lucy relies on a combination of HTTP, Server-Sent Events, and WebSockets to handle real-time orchestration gracefully.
-
 ### 3.1 REST API (HTTP)
-Standard HTTP communication handles CRUD operations (managing Agents, starting Tasks, and fetching History).
-- **Frontend to Backend:** API calls are reverse-proxied by Nginx (`/api/*` on port 2000) to the FastAPI server (port 2800).
-- **Backend to Agents:** FastAPI orchestrates remote vLLM/Ollama agents using standard HTTP POST requests to their OpenAI-compatible `/v1/chat/completions` endpoints.
-- **Agent Self-Registration:** External agents can register themselves dynamically via `POST /api/agents/register` and must send periodic heartbeats to `/api/agents/heartbeat`.
+Standard CRUD for sessions, agents, tasks, projects. Reverse-proxied through nginx (`/api/*` on port 2000 → FastAPI on port 8000).
 
-### 3.2 Real-time Streaming (SSE & WebSockets)
-To provide real-time streaming updates during long-running LangGraph executions.
-- **Server-Sent Events (SSE):** The frontend connects to `GET /api/tasks/{id}/events`. The backend continuously streams execution states (`data: {...}`) and a completion signal (`data: {"type": "done"}`) as agents complete steps.
-- **WebSockets:** 
-  - `ws://host/api/ws/logs` — Subscribes to a global stream of all internal log entries.
-  - `ws://host/api/ws/logs/{task_id}` — Subscribes to task-scoped logs.
-- **HTTP Polling (Fallback):** The UI Monitor page can also poll `GET /api/logs?limit=200` to retrieve the latest logs.
+### 3.2 Server-Sent Events (SSE) — Primary Streaming Channel
+- **`POST /api/sessions/{id}/messages`** — Streams a chat message exchange. Three event types:
+  - `log` — real-time orchestration progress (agent calls, tool invocations)
+  - `heartbeat` — keep-alive
+  - `done` — final `MessageResponse` with full `StructuredOutput`
+- **`GET /api/tasks/{id}/events`** — task-scoped log stream + final done event
 
-### 3.3 Internal Backend Pub/Sub
-- **Log Broadcaster:** Inside FastAPI, logs are broadcast using an `asyncio.Queue` based pub/sub mechanism (`logger.py`). When LangGraph nodes yield results, callbacks publish logs to the queue, immediately broadcasting them to active WebSocket and SSE subscribers.
+### 3.3 WebSocket
+- `ws://host/api/ws/logs` — global log stream (all tasks, all sessions)
+- `ws://host/api/ws/logs/{task_id}` — task-scoped log stream
+
+### 3.4 Internal Backend Pub/Sub
+`logger.py` implements an `asyncio.Queue` pub/sub. LangGraph nodes call `log_step()` which simultaneously writes to PostgreSQL and broadcasts to all subscribers (SSE clients + WebSocket clients).
+
+### 3.5 Backend to Tools
+- Web/News tools call external APIs via shared `httpx.AsyncClient`
+- Code/Shell tools spawn subprocess sandboxes with timeouts
+- File/Chart/CSV tools operate inside the session workspace (`/tmp/lucy-workspace/session_{id}/`)
+
+### 3.6 Backend to vLLM
+Shared pooled `httpx.AsyncClient` (created in lifespan). Context-window-aware input truncation. 120s default timeout.
 
 ## 4. Orchestration Flow
-
-The backend handles complex sequences using **LangGraph StateGraphs**. Requests are mapped into execution graphs based on the strategy requested (e.g., Sequential, Parallel, Council, Hierarchical).
 
 ```mermaid
 sequenceDiagram
     participant User
     participant FastAPI
     participant LangGraph
-    participant Agents (vLLM)
+    participant Agent (vLLM)
+    participant Tools
     participant Database
 
-    User->>FastAPI: POST /api/tasks
-    FastAPI->>Database: Save initial Task
-    FastAPI->>LangGraph: Initialize StateGraph & Checkpointing
-    
-    loop Per Orchestration Step
-        LangGraph->>Agents (vLLM): Prompt /v1/chat/completions
-        Agents (vLLM)-->>LangGraph: LLM Response Output
-        LangGraph->>FastAPI: Trigger Callback (Step Done)
-        FastAPI-->>User: Broadcast SSE / WebSocket Log
-        LangGraph->>Database: Persist State & Logs
+    User->>FastAPI: POST /api/sessions/{id}/messages
+    FastAPI->>Database: Persist user Message
+    FastAPI->>Database: Create Task (session_id, strategy)
+    FastAPI->>LangGraph: GraphExecutor.run(state with conversation_history + workspace_dir)
+
+    loop Per Agent Step (with tool loop)
+        LangGraph->>Agent (vLLM): chat_completion with system + history + prompt
+        Agent (vLLM)-->>LangGraph: response text
+        alt response contains <tool_call>
+            LangGraph->>Tools: execute_tool(tool_name, args, workspace_dir)
+            Tools-->>LangGraph: tool result (or error)
+            LangGraph->>Agent (vLLM): re-invoke with appended tool result
+        end
+        LangGraph->>FastAPI: log_step() callback
+        FastAPI-->>User: SSE log event
+        LangGraph->>Database: Persist TaskStep + ToolCallRecord
     end
 
-    LangGraph->>FastAPI: Task Run Complete
-    FastAPI->>Database: Update Task to Completed
-    FastAPI-->>User: Final Result Streamed
+    LangGraph->>LangGraph: build_structured_output_node
+    LangGraph->>Database: Persist Task.task_metadata + Message.structured
+    FastAPI-->>User: SSE done event (full StructuredOutput)
 ```
+
+## 5. Data Layout
+
+```
+sessions  ──(1:N)──▶  messages  ──(1:N)──▶  tool_calls
+   │                      │
+   └──(1:N)──▶  tasks  ◀──┘
+                  │
+                  ├──(1:N)──▶  task_steps  ──(N:1)──▶  agents
+                  │
+                  └──(1:N)──▶  log_entries
+```
+
+## 6. Frontend Real-time Handling
+
+The Chat page (`src/pages/Chat.tsx`) consumes the SSE stream from `POST /api/sessions/{id}/messages`:
+
+1. Optimistically renders the user message + a typing indicator
+2. Reads the SSE stream chunk-by-chunk
+3. `log` events update a live progress feed below the typing indicator
+4. `done` event triggers a query invalidation → React Query refetches the session → final structured message renders via `StructuredOutputRenderer`
+
+This means users see live agent activity (tool calls firing, agents responding) while the orchestration is still in progress.

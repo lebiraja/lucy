@@ -2,6 +2,8 @@
 
 ## Extended Features Specification
 
+> **Status note:** This document is the original feature spec for the hierarchical agent system. The platform has since evolved to include **conversational chat sessions**, **agent tool use** (web search, code execution, file I/O, charts), and **structured output rendering**. The hierarchical model below is still accurate as a strategy; see [ARCHITECTURE.md](ARCHITECTURE.md), [TOOLS.md](TOOLS.md), and [HIERARCHICAL.md](HIERARCHICAL.md) for the current full picture.
+
 ------------------------------------------------------------------------
 
 ## Overview

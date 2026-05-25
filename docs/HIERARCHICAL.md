@@ -1,9 +1,8 @@
 # Hierarchical Multi-Agent Architecture
 
-**Date:** March 10, 2026
 **Engine:** LangGraph
 
-Lucy supports a full **hierarchical, multi-level agent organization**, turning the platform from a simple task executor into an autonomous virtual company. Agents are dynamically registered and assigned roles within a unified command structure.
+Lucy supports a full **hierarchical, multi-level agent organization**, turning the platform from a simple task executor into an autonomous virtual company. Agents are dynamically registered and assigned roles within a unified command structure. Hierarchical execution can be triggered standalone via `POST /api/projects/{id}/execute` or selected as the strategy for a chat session.
 
 ---
 
@@ -132,6 +131,26 @@ After planning, the execution flows down the organizational chart and bubbles ba
 1. **CTO Breakdown:** The CTO translates the L0.5 JSON architecture plan into a list of technical objectives.
 2. **Manager Delegation:** Managers map CTO objectives into strict, itemized checklists based on their domain (Frontend, Backend, QA).
 3. **Execution Fan-Out:** `employee`, `developer`, and `tester` agents receive prompt assignments containing only their specific manager's checklist. Execution runs in parallel via `asyncio.gather()`.
-4. **Manager Review:** Managers review employee output against the original checklist. If rework is needed, the graph loops back to Execution (currently limited by `rework_count` to prevent infinite loops).
+4. **Manager Review:** Managers review employee output against the original checklist. If `state["rework_needed"]` is set, the graph loops back to `manager_delegation` (max 2 rework cycles guarded by `rework_count`).
 5. **CTO Synthesis:** The CTO combines all reviewed departmental outputs into a unified build/deliverable.
-6. **CEO Approval:** The CEO reviews the CTE synthesis against the original client prompt and strategic priorities, outputting the final executive summary.
+6. **CEO Approval:** The CEO reviews the CTO synthesis against the original client prompt and strategic priorities, outputting the final executive summary.
+7. **Structured Output:** The final node packages everything (CEO approval, all agent steps, all tool calls, files, charts) into the `StructuredOutput` dict persisted on `Task.task_metadata` and rendered in the chat UI.
+
+---
+
+## 5. Tools at Each Hierarchy Level
+
+Hierarchical agents inherit the platform's tool system with permissions scoped to their role:
+
+| Level | Role | Tools |
+|-------|------|-------|
+| 0 | CEO | `web_search`, `news_search` |
+| 0.5 | Planner, Questioner | `web_search`, `news_search`, `read_file` |
+| 2 | CTO | `web_search`, `run_code`, `run_shell`, `read_file`, `write_file`, `generate_chart` |
+| 2 | CFO | `web_search`, `news_search`, `parse_csv`, `generate_chart` |
+| 3 | Backend/Frontend/QA Manager | `web_search`, `run_code`, `read_file`, `write_file` |
+| 4 | Developer | `web_search`, `run_code`, `run_shell`, `read_file`, `write_file`, `generate_chart`, `parse_csv` |
+| 4 | Employee | `web_search`, `run_code`, `read_file`, `write_file`, `generate_chart`, `parse_csv` |
+| 4 | Tester | `run_code`, `run_shell`, `read_file`, `write_file` |
+
+The shared session workspace (`/tmp/lucy-workspace/session_{id}/`) lets agents read each other's outputs — a CTO can read a developer's generated file, a manager can review a tester's report.
